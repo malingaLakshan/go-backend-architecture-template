@@ -4,12 +4,20 @@ package httpserver
 import (
 	"log/slog"
 	"net/http"
-
-	"go-backend-architecture-template/internal/customer"
 )
 
+// CustomerHandler defines the HTTP handler methods needed for customer routes.
+// This interface breaks the import cycle between customer and httpserver packages.
+type CustomerHandler interface {
+	Create(w http.ResponseWriter, r *http.Request)
+	List(w http.ResponseWriter, r *http.Request)
+	GetByID(w http.ResponseWriter, r *http.Request)
+	Update(w http.ResponseWriter, r *http.Request)
+	Delete(w http.ResponseWriter, r *http.Request)
+}
+
 // NewRouter creates the application router with all middleware and routes.
-func NewRouter(logger *slog.Logger, customerHandler *customer.Handler) http.Handler {
+func NewRouter(logger *slog.Logger, customerHandler CustomerHandler) http.Handler {
 	mux := http.NewServeMux()
 
 	// ── Health check ────────────────────────────────────────────────────
