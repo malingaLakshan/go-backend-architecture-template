@@ -60,3 +60,52 @@ func parseLevel(level string) slog.Level {
 		return slog.LevelInfo
 	}
 }
+
+
+
+
+
+package logger
+
+import (
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func NewLogger() (*slog.Logger, error) {
+	baseLogDir := "logs"
+	logFileName := "app.log"
+
+	cleanBaseDir := filepath.Clean(baseLogDir)
+	cleanLogPath := filepath.Clean(filepath.Join(cleanBaseDir, logFileName))
+
+	if !strings.HasPrefix(cleanLogPath, cleanBaseDir) {
+		return nil, os.ErrPermission
+	}
+
+	if err := os.MkdirAll(cleanBaseDir, 0750); err != nil {
+		return nil, err
+	}
+
+	file, err := os.OpenFile(cleanLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return nil, err
+	}
+
+	writer := io.MultiWriter(os.Stdout, file)
+
+	handler := slog.NewJSONHandler(writer, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+
+	return slog.New(handler), nil
+}
+
+
+
+
+
+
