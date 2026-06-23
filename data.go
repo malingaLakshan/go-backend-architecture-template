@@ -1,56 +1,125 @@
-Please understand this project first. Do not modify code yet.
+Please add an interactive CLI dashboard/menu to the existing Replay Engine CLI MVP.
 
-Project:
-This is a Go CLI MVP for a Replay Engine inside the replay-engine-mvp-cli folder.
+Do not rewrite the full project. Keep all existing commands working.
 
-Domain:
-A Recorder tool records RFID/location reader data into a SQLite database. The Replay Engine reads that recorded SQLite file and replays the same raw reader data into a target system. For this MVP, the target system is a mock HTTP server.
+Project folder:
+replay-engine-mvp-cli
 
-Main purpose:
-The Replay Engine helps replay the same recorded RFID test multiple times so different target system versions/configurations can be tested with the same input data.
+Required new command:
+go run ./cmd/rre dashboard
 
-Important concepts:
+Also, if possible, when user runs:
+go run ./cmd/rre
 
-* SQLite recording file = recorded test data
-* SiteInformation = recorded site configuration
-* RawReads = recorded RFID reader records
-* InjectionTime = original timing used for replay pacing
-* Pacing = replaying records with the same time gaps as the original recording
-* Mock target server = fake target system for MVP testing
+show the dashboard by default.
 
-MVP features:
+Files to change/add:
 
-1. Generate sample SQLite recording data.
-2. Insert sample SiteInformation.
-3. Insert sample RawReads with x/y movement.
-4. Show recording summary.
-5. Validate recorded site against target site.
-6. Replay raw records ordered by InjectionTime.
-7. Preserve timing gaps using InjectionTime.
-8. Send replay payloads to mock target server.
-9. Maintain console logs and file logs.
-10. Support safe Ctrl+C abort.
+1. cmd/rre/main.go
+
+* Register or route the new dashboard command.
+* If no command is provided, open dashboard mode.
+
+2. internal/cli/commands.go
+
+* Add dashboard command handling.
+* Keep existing commands unchanged:
+    * generate-sample
+    * summary
+    * mock-server
+    * validate
+    * play
+
+3. internal/cli/dashboard.go
+
+* Create this new file.
+* Implement interactive terminal menu.
+
+4. internal/cli/args.go
+
+* Add default dashboard values if needed:
+    * recording file: data/sample_recording.sqlite
+    * target URL: http://localhost:9090
+    * site ID: SITE-001
+    * mock server port: 9090
+
+5. internal/mocktarget/server.go
+
+* Only change this if needed to allow mock server to start from dashboard mode in a goroutine.
+* Add safe handling so dashboard does not start multiple servers on the same port.
+
+Do not change these unless absolutely necessary:
+
+* internal/replay/service.go
+* internal/replay/pacing.go
+* internal/replay/injector.go
+* internal/recording/repository.go
+* internal/site/validator.go
+* internal/logger/logger.go
+
+Dashboard menu:
+
+Replay Engine CLI MVP
+
+1. Generate sample recording
+2. Show recording summary
+3. Start mock target server
+4. Validate site
+5. Play replay
+6. Run full demo flow
+7. Exit
+
+Expected behavior:
+
+1. Generate sample recording
+
+* Use default file path: data/sample_recording.sqlite
+* Generate 50 sample raw records.
+* Print success message.
+
+2. Show recording summary
+
+* Read default SQLite file.
+* Print recording details and estimated replay duration.
+
+3. Start mock target server
+
+* Start server on port 9090.
+* In dashboard mode, start it in background using goroutine.
+* If already running, show “Mock server already running”.
+
+4. Validate site
+
+* Validate SITE-001 against http://localhost:9090.
+* Show pass/fail clearly.
+
+5. Play replay
+
+* Run validation first.
+* If validation fails, do not replay.
+* If validation passes, replay records using InjectionTime pacing.
+* Show terminal progress and final summary.
+
+6. Run full demo flow
+
+* Generate sample recording.
+* Show summary.
+* Start mock server if not running.
+* Validate SITE-001.
+* Play replay.
+* Print final summary.
+
+7. Exit
+
+* Exit cleanly.
 
 Important rules:
 
-* Do not send all records immediately.
-* First record can be sent immediately.
-* Every next record must wait based on the InjectionTime gap.
-* If validation fails, replay must not start.
-* If one injection fails during replay, log it and continue.
-* No pause feature. Only stop/abort.
-* Logs should go to console and logs/rre.log.
-* Generated SQLite files and log files should not be committed.
-
-Please analyze the current project and explain:
-
-1. Current folder structure.
-2. Main CLI commands.
-3. Package responsibilities.
-4. Replay flow.
-5. Validation flow.
-6. Logging flow.
-7. Whether this project matches the MVP requirements.
-8. Any issues or improvements.
-
-Do not change files yet. First give me your analysis.
+* Use simple terminal input/output.
+* Prefer Go standard library only.
+* Do not add heavy CLI UI libraries.
+* Keep existing CLI commands working.
+* Do not commit generated data/sample_recording.sqlite or logs/rre.log.
+* Do not rewrite unrelated files.
+* Reuse existing services/functions as much as possible.
+* First explain your planned changes file by file, then provide code changes.
