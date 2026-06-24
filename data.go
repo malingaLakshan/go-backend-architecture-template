@@ -1,125 +1,102 @@
-Please add an interactive CLI dashboard/menu to the existing Replay Engine CLI MVP.
+Please analyze the current replay-engine-mvp-cli Go project and create/update architecture documentation automatically.
 
-Do not rewrite the full project. Keep all existing commands working.
+Do not change application logic.
 
-Project folder:
-replay-engine-mvp-cli
+Target file:
+replay-engine-mvp-cli/docs/ARCHITECTURE.md
 
-Required new command:
-go run ./cmd/rre dashboard
+If the file does not exist, create it.
+If it already exists, update it cleanly.
 
-Also, if possible, when user runs:
-go run ./cmd/rre
+Project context:
+This is a Go CLI MVP for a Replay Engine.
 
-show the dashboard by default.
+Current structure:
 
-Files to change/add:
+* cmd/rre/main.go = application entry point
+* internal/cli = command parsing, dashboard menu, command orchestration
+* internal/sqlite = SQLite connection, schema, sample data generation
+* internal/recording = recording summary, site information, raw reads from SQLite
+* internal/site = target site fetching and site validation
+* internal/replay = replay service, InjectionTime pacing, status, payload injection
+* internal/mocktarget = local mock target HTTP server
+* internal/logger = console and file logging
+* data/sample_recording.sqlite = generated sample SQLite recording file
+* logs/rre.log = generated log file
 
-1. cmd/rre/main.go
+Need:
+Add a professional high-level architecture document with Mermaid diagrams.
 
-* Register or route the new dashboard command.
-* If no command is provided, open dashboard mode.
+In docs/ARCHITECTURE.md, include:
 
-2. internal/cli/commands.go
+1. Title:
+    Replay Engine CLI MVP - Architecture
+2. Short overview:
+    Explain that this tool reads recorded RFID/location data from SQLite and replays it to a target system using original InjectionTime pacing.
+3. Diagram 1:
+    High-level component architecture Mermaid diagram.
 
-* Add dashboard command handling.
-* Keep existing commands unchanged:
-    * generate-sample
-    * summary
-    * mock-server
-    * validate
-    * play
+It should include:
 
-3. internal/cli/dashboard.go
+* User
+* CLI Dashboard / Commands
+* SQLite Recording File
+* Recording Reader
+* Site Validator
+* Replay Engine
+* Pacing Logic
+* HTTP Injector
+* Mock Target Server
+* Logger
 
-* Create this new file.
-* Implement interactive terminal menu.
+4. Diagram 2:
+    Replay flow sequence Mermaid diagram.
 
-4. internal/cli/args.go
+It should show:
 
-* Add default dashboard values if needed:
-    * recording file: data/sample_recording.sqlite
-    * target URL: http://localhost:9090
-    * site ID: SITE-001
-    * mock server port: 9090
+* User starts dashboard/play
+* CLI opens SQLite recording
+* Reads SiteInformation
+* Fetches target site configuration
+* Validates recorded site vs target site
+* Reads RawReads ordered by InjectionTime
+* Calculates pacing delay
+* Sends payload to mock target server
+* Logs progress
+* Completes or aborts safely
 
-5. internal/mocktarget/server.go
+5. Add short section:
+    Package responsibilities
 
-* Only change this if needed to allow mock server to start from dashboard mode in a goroutine.
-* Add safe handling so dashboard does not start multiple servers on the same port.
+Explain each package shortly:
 
-Do not change these unless absolutely necessary:
+* cmd/rre
+* internal/cli
+* internal/sqlite
+* internal/recording
+* internal/site
+* internal/replay
+* internal/mocktarget
+* internal/logger
 
-* internal/replay/service.go
-* internal/replay/pacing.go
-* internal/replay/injector.go
-* internal/recording/repository.go
-* internal/site/validator.go
-* internal/logger/logger.go
+6. Add short section:
+    Replay rules
 
-Dashboard menu:
+Mention:
 
-Replay Engine CLI MVP
+* Validation must pass before replay starts.
+* Raw records must be ordered by InjectionTime.
+* First record can be sent immediately.
+* Next records must wait based on InjectionTime gap.
+* Single injection failure should be logged and replay should continue.
+* Ctrl+C should abort safely.
+* Generated SQLite/log files should not be committed.
 
-1. Generate sample recording
-2. Show recording summary
-3. Start mock target server
-4. Validate site
-5. Play replay
-6. Run full demo flow
-7. Exit
+Important:
 
-Expected behavior:
-
-1. Generate sample recording
-
-* Use default file path: data/sample_recording.sqlite
-* Generate 50 sample raw records.
-* Print success message.
-
-2. Show recording summary
-
-* Read default SQLite file.
-* Print recording details and estimated replay duration.
-
-3. Start mock target server
-
-* Start server on port 9090.
-* In dashboard mode, start it in background using goroutine.
-* If already running, show “Mock server already running”.
-
-4. Validate site
-
-* Validate SITE-001 against http://localhost:9090.
-* Show pass/fail clearly.
-
-5. Play replay
-
-* Run validation first.
-* If validation fails, do not replay.
-* If validation passes, replay records using InjectionTime pacing.
-* Show terminal progress and final summary.
-
-6. Run full demo flow
-
-* Generate sample recording.
-* Show summary.
-* Start mock server if not running.
-* Validate SITE-001.
-* Play replay.
-* Print final summary.
-
-7. Exit
-
-* Exit cleanly.
-
-Important rules:
-
-* Use simple terminal input/output.
-* Prefer Go standard library only.
-* Do not add heavy CLI UI libraries.
-* Keep existing CLI commands working.
-* Do not commit generated data/sample_recording.sqlite or logs/rre.log.
-* Do not rewrite unrelated files.
-* Reuse existing services/functions as much as possible.
-* First explain your planned changes file by file, then provide code changes.
+* Use Mermaid code blocks inside the markdown file.
+* Keep the document clean, professional, and easy to understand.
+* Do not include confidential company data.
+* Use generic names only.
+* Do not modify Go source code.
+* After updating the file, show me the final file path and a short summary of what was added.
