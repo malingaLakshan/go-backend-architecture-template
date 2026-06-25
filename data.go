@@ -1,33 +1,87 @@
-Please remove all emojis from CLI terminal output and logs in the replay-engine-mvp-cli project.
+We need to convert the Replay Engine MVP into a proper command-line tool.
 
-Reason:
-This is an internal/company CLI tool, so terminal output should be professional, plain-text, and compatible with all terminals.
+Current issue:
+The project currently has an interactive dashboard flow, but QA and the team need to test it by typing commands directly in the terminal. The tool should behave like a professional CLI tool.
 
-Files to check:
+Goal:
+Make the main usage command-based, similar to:
 
-* internal/cli/commands.go
-* internal/cli/dashboard.go
-* any other file that prints CLI messages using fmt.Print, fmt.Println, or fmt.Printf
+* rr -help
+* rr --help
+* rr help
+* rr generate-sample -out data/sample_recording.sqlite
+* rr summary -file data/sample_recording.sqlite
+* rr mock-server -port 8080
+* rr validate -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
+* rr play -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
+
+Important:
+Do not remove the dashboard completely. Keep it as an optional command:
+
+* rr dashboard
+
+But the default and primary behavior must be command-line usage.
 
 Required changes:
-Replace emoji-based messages with plain text status prefixes.
 
-Use this style:
+1. Update CLI argument parsing so root help works:
+    * rr -help
+    * rr --help
+    * rr help
+2. Root help should display:
+    * tool name
+    * short description
+    * available commands
+    * example commands
+3. Each command should support its own help:
+    * rr play -help
+    * rr validate -help
+    * rr generate-sample -help
+    * rr summary -help
+    * rr mock-server -help
+    * rr dashboard -help
+4. The tool should not force the dashboard when no command is provided.
+    Instead, show help and return a clear message.
+5. Keep existing business logic:
+    * sample generation
+    * summary
+    * mock server
+    * validation
+    * replay
+    * dashboard
+6. Do not refactor unrelated packages.
+7. Do not change database schema.
+8. Do not change replay logic.
+9. Do not change validation logic.
+10. Only update CLI parsing, help text, and command routing where needed.
 
-* ✅ Validation passed. Ready to replay. → [OK] Validation passed. Ready to replay.
-* ❌ Validation failed. ... → [ERROR] Validation failed: ...
-* ⚠️ ... → [WARN] ...
-* ℹ️ ... → [INFO] ...
-* 🚀 Replay started → [INFO] Replay started.
-* 🎉 Replay completed → [OK] Replay completed.
-* 🛑 Replay aborted → [WARN] Replay aborted by user.
+Expected command behavior:
 
-Rules:
+rr -help
+Should print available commands and examples.
 
-* Do not change business logic.
-* Do not refactor unrelated code.
-* Do not change function names.
-* Do not change CLI command behavior.
-* Only update user-facing terminal output and any log messages that contain emojis.
-* Keep output clear, simple, and professional.
-* After changes, show me the list of changed files.
+rr generate-sample -out data/sample_recording.sqlite
+Should generate a sample SQLite recording file.
+
+rr summary -file data/sample_recording.sqlite
+Should print recording summary.
+
+rr mock-server -port 8080
+Should start mock target server.
+
+rr validate -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
+Should validate recorded site data against target site data.
+
+rr play -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
+Should replay raw records using InjectionTime pacing.
+
+rr dashboard
+Should open the existing interactive dashboard.
+
+Also update README usage section with the new command-based examples.
+
+After changes, show:
+
+* changed files
+* final command examples
+* how to build Windows executable as rr.exe
