@@ -1,87 +1,78 @@
-We need to convert the Replay Engine MVP into a proper command-line tool.
+We need to update the Replay Engine CLI identity and help output.
 
-Current issue:
-The project currently has an interactive dashboard flow, but QA and the team need to test it by typing commands directly in the terminal. The tool should behave like a professional CLI tool.
+Context:
+This project is the Resonate Replay Engine, so the command name must be rre, not rr. rr can be confused with Recorder-related tooling.
 
-Goal:
-Make the main usage command-based, similar to:
+Scope:
+Only update CLI argument parsing/help text, README usage examples, and documentation examples.
+Do not change replay business logic, validation logic, SQLite logic, pacing logic, or mock server logic.
 
-* rr -help
-* rr --help
-* rr help
-* rr generate-sample -out data/sample_recording.sqlite
-* rr summary -file data/sample_recording.sqlite
-* rr mock-server -port 8080
-* rr validate -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
-* rr play -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
+Required command name:
 
-Important:
-Do not remove the dashboard completely. Keep it as an optional command:
+* Tool name: rre
+* Windows executable name: rre.exe
+* Keep Go entry folder as cmd/rre
 
-* rr dashboard
+Help behavior:
+The following should show root help:
 
-But the default and primary behavior must be command-line usage.
+* go run ./cmd/rre help
+* go run ./cmd/rre -help
+* go run ./cmd/rre --help
+* .\rre.exe help
+* .\rre.exe -help
+* .\rre.exe --help
 
-Required changes:
+Root help must clearly show:
 
-1. Update CLI argument parsing so root help works:
-    * rr -help
-    * rr --help
-    * rr help
-2. Root help should display:
-    * tool name
-    * short description
-    * available commands
-    * example commands
-3. Each command should support its own help:
-    * rr play -help
-    * rr validate -help
-    * rr generate-sample -help
-    * rr summary -help
-    * rr mock-server -help
-    * rr dashboard -help
-4. The tool should not force the dashboard when no command is provided.
-    Instead, show help and return a clear message.
-5. Keep existing business logic:
-    * sample generation
-    * summary
-    * mock server
-    * validation
-    * replay
-    * dashboard
-6. Do not refactor unrelated packages.
-7. Do not change database schema.
-8. Do not change replay logic.
-9. Do not change validation logic.
-10. Only update CLI parsing, help text, and command routing where needed.
+Tool name:
+rre - Resonate Replay Engine
 
-Expected command behavior:
+Description:
+Replay recorded RFID/location reader data from a SQLite recording file into a target Resonate HTTP instance.
 
-rr -help
-Should print available commands and examples.
+Usage:
+rre <command> [flags]
 
-rr generate-sample -out data/sample_recording.sqlite
-Should generate a sample SQLite recording file.
+Windows PowerShell note:
+When running a local executable in Windows PowerShell, use .\rre.exe instead of rre unless the executable folder is added to PATH.
 
-rr summary -file data/sample_recording.sqlite
-Should print recording summary.
+Available commands:
 
-rr mock-server -port 8080
-Should start mock target server.
+* help - Show help information
+* generate-sample - Generate a sample SQLite recording file
+* summary - Show recording summary
+* mock-server - Start mock target server
+* validate - Validate recorded site configuration against target site
+* play - Replay recorded raw reads to target Resonate instance
+* dashboard - Open optional interactive dashboard
 
-rr validate -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
-Should validate recorded site data against target site data.
+Examples must use rre, not rr.
 
-rr play -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
-Should replay raw records using InjectionTime pacing.
+Development examples:
 
-rr dashboard
-Should open the existing interactive dashboard.
+* go run ./cmd/rre help
+* go run ./cmd/rre generate-sample -out data/sample_recording.sqlite
+* go run ./cmd/rre summary -file data/sample_recording.sqlite
+* go run ./cmd/rre mock-server -port 8080
+* go run ./cmd/rre validate -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
+* go run ./cmd/rre play -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
 
-Also update README usage section with the new command-based examples.
+Windows executable examples:
 
-After changes, show:
+* .\rre.exe help
+* .\rre.exe generate-sample -out data/sample_recording.sqlite
+* .\rre.exe summary -file data/sample_recording.sqlite
+* .\rre.exe mock-server -port 8080
+* .\rre.exe validate -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
+* .\rre.exe play -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
 
-* changed files
-* final command examples
-* how to build Windows executable as rr.exe
+Build command:
+go build -o rre.exe ./cmd/rre
+
+Rules:
+
+* Do not remove dashboard, but keep it as optional command only.
+* When no command is provided, show root help clearly.
+* Remove old rr command examples from help/README/docs.
+* After changes, show changed files and final help output.
