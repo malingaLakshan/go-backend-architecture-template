@@ -1,78 +1,70 @@
-We need to update the Replay Engine CLI identity and help output.
+Now update the replay request payload format to match the required Resonate Replay Engine output JSON contract.
 
-Context:
-This project is the Resonate Replay Engine, so the command name must be rre, not rr. rr can be confused with Recorder-related tooling.
+Required replay output JSON shape:
 
-Scope:
-Only update CLI argument parsing/help text, README usage examples, and documentation examples.
-Do not change replay business logic, validation logic, SQLite logic, pacing logic, or mock server logic.
+{
+“ProtoReaderBundle”: {
+“reader_id”: 42,
+“reads”: [
+{
+“timestamp_ns”: 42,
+“confidence”: 42,
+“antenna_id”: 42,
+“antenna_type”: 2,
+“x”: 42,
+“y”: 42,
+“item_id”: “Sample text”,
+“floor_id”: 42
+}
+],
+“site_id”: “Sample text”,
+“sent_timestamp_ms”: 42
+}
+}
 
-Required command name:
+Important:
+The values above are only example values. Do not hardcode 42 or “Sample text” in replay logic.
 
-* Tool name: rre
-* Windows executable name: rre.exe
-* Keep Go entry folder as cmd/rre
+Replay rules:
 
-Help behavior:
-The following should show root help:
+1. Read records from the SQLite RawReads table.
+2. Records must be replayed strictly ordered by InjectionTime.
+3. Each replayed HTTP request body must use the JSON wrapper key ProtoReaderBundle.
+4. ProtoReaderBundle must contain:
+    * reader_id
+    * reads
+    * site_id
+    * sent_timestamp_ms
+5. reads must be an array of ProtoRead objects.
+6. Each ProtoRead object must contain:
+    * timestamp_ns
+    * confidence
+    * antenna_id
+    * antenna_type
+    * x
+    * y
+    * item_id
+    * floor_id
+7. If the SQLite row already contains payload JSON, inspect it and convert/wrap it into the required ProtoReaderBundle structure if needed.
+8. Do not send reads as an array of strings.
+9. Do not change the database schema unless absolutely necessary.
+10. Do not change site validation logic in this task.
+11. Do not change CLI command names in this task.
+12. Keep the existing pacing behavior based on InjectionTime.
 
-* go run ./cmd/rre help
-* go run ./cmd/rre -help
-* go run ./cmd/rre --help
-* .\rre.exe help
-* .\rre.exe -help
-* .\rre.exe --help
+Endpoint:
+Continue sending replay payloads to the existing target HTTP endpoint used by the project, such as /reader-bundles, unless the current code already uses a different endpoint intentionally.
 
-Root help must clearly show:
+Add clear unit/helper functions if needed:
 
-Tool name:
-rre - Resonate Replay Engine
+* Build replay payload from SQLite raw read row
+* Validate replay payload shape before sending
+* Marshal replay payload to JSON
 
-Description:
-Replay recorded RFID/location reader data from a SQLite recording file into a target Resonate HTTP instance.
+Add one debug-safe log line that shows replay payload was prepared, but do not print full payload for every record unless debug mode already exists.
 
-Usage:
-rre <command> [flags]
+After changes, show:
 
-Windows PowerShell note:
-When running a local executable in Windows PowerShell, use .\rre.exe instead of rre unless the executable folder is added to PATH.
-
-Available commands:
-
-* help - Show help information
-* generate-sample - Generate a sample SQLite recording file
-* summary - Show recording summary
-* mock-server - Start mock target server
-* validate - Validate recorded site configuration against target site
-* play - Replay recorded raw reads to target Resonate instance
-* dashboard - Open optional interactive dashboard
-
-Examples must use rre, not rr.
-
-Development examples:
-
-* go run ./cmd/rre help
-* go run ./cmd/rre generate-sample -out data/sample_recording.sqlite
-* go run ./cmd/rre summary -file data/sample_recording.sqlite
-* go run ./cmd/rre mock-server -port 8080
-* go run ./cmd/rre validate -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
-* go run ./cmd/rre play -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
-
-Windows executable examples:
-
-* .\rre.exe help
-* .\rre.exe generate-sample -out data/sample_recording.sqlite
-* .\rre.exe summary -file data/sample_recording.sqlite
-* .\rre.exe mock-server -port 8080
-* .\rre.exe validate -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
-* .\rre.exe play -file data/sample_recording.sqlite -target-url http://localhost:8080 -site-id SITE-001
-
-Build command:
-go build -o rre.exe ./cmd/rre
-
-Rules:
-
-* Do not remove dashboard, but keep it as optional command only.
-* When no command is provided, show root help clearly.
-* Remove old rr command examples from help/README/docs.
-* After changes, show changed files and final help output.
+* changed files
+* sample generated replay payload
+* command used to test replay
