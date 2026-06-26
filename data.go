@@ -1,62 +1,41 @@
-We need to verify and fix only the replay HTTP request JSON body format.
+The mock server is still only printing summary logs like:
 
-Important:
-Do not change InjectionTime pacing logic.
-Do not change replay timing behavior.
-Do not change record ordering.
-Do not change validation logic.
-Do not change CLI command names.
-Do not change dashboard logic.
+Received bundle: site_id=SITE-001 reader_id=READER-01 payload_size=244
 
-Current replay timing rule must remain:
+That is not enough. I need to verify the exact raw HTTP request JSON body received by the mock server.
 
-* Read RawReads ordered by InjectionTime
-* Send first record immediately
-* For each next record, wait the time difference between current InjectionTime and previous InjectionTime
-* Then send the next replay payload
+Please update the mock target server handler for POST /reader-bundles.
 
-Task:
-Check the actual JSON body sent to the target /reader-bundles endpoint.
+Requirements:
 
-Required replay output JSON shape:
+1. Read the full raw HTTP request body.
+2. Print only the first received replay payload to the terminal with this heading:
+    First received replay payload:
+3. Save every received replay payload into this file:
+    logs/received_payloads.jsonl
+4. Each received payload should be written as one JSON line.
+5. Create the logs folder if it does not exist.
+6. Keep existing summary logs if needed.
+7. Do not change replay timing.
+8. Do not change InjectionTime pacing.
+9. Do not change record ordering.
+10. Do not change validation logic.
+11. Do not change CLI command names.
 
-{
-“ProtoReaderBundle”: {
-“reader_id”: 42,
-“reads”: [
-{
-“timestamp_ns”: 42,
-“confidence”: 42,
-“antenna_id”: 42,
-“antenna_type”: 2,
-“x”: 42,
-“y”: 42,
-“item_id”: “Sample text”,
-“floor_id”: 42
-}
-],
-“site_id”: “Sample text”,
-“sent_timestamp_ms”: 42
-}
-}
+Expected terminal output should include:
+
+First received replay payload:
+
+Then the actual JSON body received by the mock server.
+
+Expected saved file:
+logs/received_payloads.jsonl
 
 Important:
 
-* Do not hardcode 42 or “Sample text”.
-* Values must come from the SQLite RawReads payload/recorded data.
-* The HTTP request body must have top-level key ProtoReaderBundle.
-* reads must be an array of read objects, not strings.
-* Keep existing InjectionTime-based scheduling exactly as it is.
-
-For verification:
-
-* Update mock target server debug/test output so it can show the first received replay JSON body clearly.
-* It is okay to print only the first received payload or save received payloads into a debug file like logs/received_payloads.jsonl.
-* Keep normal logs professional and not too noisy.
-
-After changes, show:
-
-1. Which function builds the replay payload
-2. The exact first received JSON body from mock server
-3. Confirmation that InjectionTime pacing was not changed
-4. Changed files
+* Do not hardcode sample values.
+* Save the actual request body received from Replay Engine.
+* The replay payload should match the required top-level structure with ProtoReaderBundle.
+* Do not print every payload to terminal because it will be noisy.
+* Only print the first payload, but save all received payloads to the jsonl file.
+* After changes, tell me which file and function were updated.
