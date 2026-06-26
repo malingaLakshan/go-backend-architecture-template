@@ -1,41 +1,43 @@
-The mock server is still only printing summary logs like:
+The previous change did not produce the expected output.
 
-Received bundle: site_id=SITE-001 reader_id=READER-01 payload_size=244
+Problem:
+After running replay, I still cannot see the actual received JSON payload in terminal or in a separate payload file. I only see normal logs/summary.
 
-That is not enough. I need to verify the exact raw HTTP request JSON body received by the mock server.
+Please fix this specifically in the mock target server POST /reader-bundles handler.
 
-Please update the mock target server handler for POST /reader-bundles.
+Required behavior:
 
-Requirements:
-
-1. Read the full raw HTTP request body.
-2. Print only the first received replay payload to the terminal with this heading:
-    First received replay payload:
-3. Save every received replay payload into this file:
+1. When mock server receives POST /reader-bundles, read the raw HTTP request body using io.ReadAll(r.Body).
+2. Save the exact raw request body into:
     logs/received_payloads.jsonl
-4. Each received payload should be written as one JSON line.
-5. Create the logs folder if it does not exist.
-6. Keep existing summary logs if needed.
-7. Do not change replay timing.
-8. Do not change InjectionTime pacing.
-9. Do not change record ordering.
-10. Do not change validation logic.
-11. Do not change CLI command names.
-
-Expected terminal output should include:
-
-First received replay payload:
-
-Then the actual JSON body received by the mock server.
-
-Expected saved file:
-logs/received_payloads.jsonl
+3. Each HTTP request body must be written as one line in that file.
+4. Create the logs folder if it does not exist.
+5. Print only the first received raw request body to terminal with this heading:
+    First received replay payload:
+6. The terminal output must show the real JSON body, not only site_id, reader_id, or payload_size.
+7. Keep the existing summary log also if needed.
 
 Important:
 
-* Do not hardcode sample values.
-* Save the actual request body received from Replay Engine.
-* The replay payload should match the required top-level structure with ProtoReaderBundle.
-* Do not print every payload to terminal because it will be noisy.
-* Only print the first payload, but save all received payloads to the jsonl file.
-* After changes, tell me which file and function were updated.
+* Do not write normal logger messages into received_payloads.jsonl.
+* received_payloads.jsonl must contain only replay HTTP request JSON bodies.
+* Do not change InjectionTime pacing.
+* Do not change replay timing.
+* Do not change record ordering.
+* Do not change validation logic.
+* Do not change CLI command names.
+
+Implementation hint:
+In the POST /reader-bundles handler, do something similar to:
+
+* bodyBytes, err := io.ReadAll(r.Body)
+* save bodyBytes to logs/received_payloads.jsonl
+* print the first payload to terminal
+* then unmarshal/parse the same bodyBytes if the handler still needs to extract site_id or reader_id
+
+After changes, show me:
+
+1. The file/function changed
+2. The code section that reads r.Body
+3. The code section that writes to logs/received_payloads.jsonl
+4. The terminal output showing First received replay payload:
