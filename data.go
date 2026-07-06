@@ -35,8 +35,6 @@ func NewInjector(targetURL string) *Injector {
 	}
 }
 
-// validateAllowedTarget validates the input target URL and returns
-// an internal allowlist key. For this MVP, only the local mock server is allowed.
 func validateAllowedTarget(targetURL string) (string, error) {
 	if strings.TrimSpace(targetURL) == "" {
 		return "", fmt.Errorf("target URL must not be empty")
@@ -81,8 +79,7 @@ func validateAllowedTarget(targetURL string) (string, error) {
 	return "", fmt.Errorf("target URL is not allowlisted")
 }
 
-// buildReaderBundlesURL is kept for tests and validation.
-// It returns only hardcoded allowlisted endpoints.
+// buildReaderBundlesURL is kept for existing tests.
 func buildReaderBundlesURL(targetURL string) (string, error) {
 	target, err := validateAllowedTarget(targetURL)
 	if err != nil {
@@ -101,7 +98,6 @@ func buildReaderBundlesURL(targetURL string) (string, error) {
 }
 
 // Send posts a ProtoReaderBundle payload to the target endpoint.
-// Endpoint: POST /reader-bundles
 func (inj *Injector) Send(payload *ProtoReaderBundleWrapper) error {
 	jsonBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -114,62 +110,43 @@ func (inj *Injector) Send(payload *ProtoReaderBundleWrapper) error {
 	}
 
 	if target == targetLocalhost {
-		return inj.sendToLocalhost(jsonBytes)
+		return inj.postToLocalhost(jsonBytes)
 	}
 
 	if target == targetLoopback {
-		return inj.sendToLoopback(jsonBytes)
+		return inj.postToLoopback(jsonBytes)
 	}
 
 	return fmt.Errorf("target URL is not allowlisted")
 }
 
-func (inj *Injector) sendToLocalhost(jsonBytes []byte) error {
-	req, err := http.NewRequest(
-		http.MethodPost,
+func (inj *Injector) postToLocalhost(jsonBytes []byte) error {
+	resp, err := inj.HTTPClient.Post(
 		readerBundlesLocalhost,
+		"application/json",
 		bytes.NewReader(jsonBytes),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := inj.HTTPClient.Do(req)
-	if err != nil {
 		return fmt.Errorf("failed to send payload: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf(
-			"target returned status %d: %s",
-			resp.StatusCode,
-			string(body),
-		)
-	}
-
-	return nil
+	return handleResponse(resp)
 }
 
-func (inj *Injector) sendToLoopback(jsonBytes []byte) error {
-	req, err := http.NewRequest(
-		http.MethodPost,
+func (inj *Injector) postToLoopback(jsonBytes []byte) error {
+	resp, err := inj.HTTPClient.Post(
 		readerBundlesLoopback,
+		"application/json",
 		bytes.NewReader(jsonBytes),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := inj.HTTPClient.Do(req)
-	if err != nil {
 		return fmt.Errorf("failed to send payload: %w", err)
 	}
+
+	return handleResponse(resp)
+}
+
+func handleResponse(resp *http.Response) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
