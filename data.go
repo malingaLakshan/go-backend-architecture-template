@@ -90,14 +90,15 @@ func buildReaderBundlesURL(targetURL string) (string, error) {
 		return "", err
 	}
 
-	switch target {
-	case targetLocalhost:
+	if target == targetLocalhost {
 		return readerBundlesLocalhost, nil
-	case targetLoopback:
-		return readerBundlesLoopback, nil
-	default:
-		return "", fmt.Errorf("target URL is not allowlisted")
 	}
+
+	if target == targetLoopback {
+		return readerBundlesLoopback, nil
+	}
+
+	return "", fmt.Errorf("target URL is not allowlisted")
 }
 
 // Send posts a ProtoReaderBundle payload to the target endpoint.
@@ -113,36 +114,44 @@ func (inj *Injector) Send(payload *ProtoReaderBundleWrapper) error {
 		return fmt.Errorf("invalid target URL: %w", err)
 	}
 
-	switch target {
-	case targetLocalhost:
+	if target == targetLocalhost {
 		return inj.sendToLocalhost(jsonBytes)
-
-	case targetLoopback:
-		return inj.sendToLoopback(jsonBytes)
-
-	default:
-		return fmt.Errorf("target URL is not allowlisted")
 	}
+
+	if target == targetLoopback {
+		return inj.sendToLoopback(jsonBytes)
+	}
+
+	return fmt.Errorf("target URL is not allowlisted")
 }
 
 func (inj *Injector) sendToLocalhost(jsonBytes []byte) error {
-	return inj.sendJSON(readerBundlesLocalhost, jsonBytes)
-}
-
-func (inj *Injector) sendToLoopback(jsonBytes []byte) error {
-	return inj.sendJSON(readerBundlesLoopback, jsonBytes)
-}
-
-func (inj *Injector) sendJSON(endpoint string, jsonBytes []byte) error {
 	req, err := http.NewRequest(
 		http.MethodPost,
-		endpoint,
+		readerBundlesLocalhost,
 		bytes.NewReader(jsonBytes),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
+	return inj.executeRequest(req)
+}
+
+func (inj *Injector) sendToLoopback(jsonBytes []byte) error {
+	req, err := http.NewRequest(
+		http.MethodPost,
+		readerBundlesLoopback,
+		bytes.NewReader(jsonBytes),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	return inj.executeRequest(req)
+}
+
+func (inj *Injector) executeRequest(req *http.Request) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := inj.HTTPClient.Do(req)
