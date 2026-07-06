@@ -1,93 +1,84 @@
-Copilot Agent, fix the remaining Cycode SAST failures exactly at:
+Copilot Agent, do minimal changes only.
 
-internal/recording/repository.go line 181
-internal/replay/injector.go line 92
+Very important:
+Do not change existing function names.
+Do not change function signatures.
+Do not change return types.
+Do not change command behavior.
+Do not refactor service architecture.
 
-Do not make large changes. Keep behavior same.
+Only fix Cycode SAST issues with the smallest possible changes.
 
-Issue 1: repository.go SQL injection
+Issue 1: internal/replay/injector.go
+Cycode reports SSRF in HTTP request.
 
-Cycode still detects unsafe SQL because the code still builds SQL using dynamic table/column values.
+Keep:
 
-Fix this by removing generic dynamic SQL for the scanned functions.
+func NewInjector(targetURL string) *Injector
 
-For CountTable, do not use:
+Keep:
 
-fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
+func (inj *Injector) Send(payload *ProtoReaderBundleWrapper) error
 
-Instead, use a switch statement and hardcoded SQL per allowed table.
+Inside Send, before http.NewRequest, validate and build the endpoint using a helper.
 
-Example style:
+Do not use:
 
-case "RawReads": query = "SELECT COUNT(*) FROM RawReads"
+fmt.Sprintf("%s/reader-bundles", inj.TargetURL)
 
-Do the same for all allowed internal tables.
+Instead:
 
-For GetUniqueCount, do not build SQL using dynamic table or column names.
+* parse inj.TargetURL using net/url
+* allow only http and https
+* reject empty host
+* reject URL with username/password
+* build final endpoint using url.URL
+* hardcode path as /reader-bundles
+* pass only the validated endpoint string to http.NewRequest
 
-Use hardcoded switch cases for allowed combinations only.
+Keep the existing behavior and timeout.
+
+Issue 2: internal/recording/repository.go
+Cycode reports SQL injection.
+
+Do not change function signatures.
+
+Keep existing functions:
+
+CountTable(...)
+
+GetUniqueCount(...)
+
+But inside them, remove SQL identifier fmt.Sprintf.
+
+For CountTable, use a switch with hardcoded SQL strings.
 
 Example:
 
-case table == "RawReads" && column == "TagID": query = "SELECT COUNT(DISTINCT TagID) FROM RawReads WHERE RecordingSessionID = ?"
+case “RawReads”:
+query = “SELECT COUNT(*) FROM RawReads”
 
-case table == "RawReads" && column == "ReaderID": query = "SELECT COUNT(DISTINCT ReaderID) FROM RawReads WHERE RecordingSessionID = ?"
+case “RecordingSession”:
+query = “SELECT COUNT(*) FROM RecordingSession”
 
-Return an error for unsupported table/column.
+Return error for unsupported table.
 
-Goal: no fmt.Sprintf for SQL identifiers in these functions.
+For GetUniqueCount, use hardcoded table + column combinations only.
 
-Issue 2: injector.go SSRF
+Example:
 
-Cycode still detects SSRF because request URL is created from TargetURL.
+case table == “RawReads” && column == “TagID”:
+query = “SELECT COUNT(DISTINCT TagID) FROM RawReads WHERE RecordingSessionID = ?”
 
-Fix by adding strict target URL validation before http.NewRequest.
+case table == “RawReads” && column == “ReaderID”:
+query = “SELECT COUNT(DISTINCT ReaderID) FROM RawReads WHERE RecordingSessionID = ?”
 
-Create a helper like:
+Return error for unsupported combination.
 
-buildReaderBundlesURL(targetURL string) (string, error)
-
-Inside it:
-
-* parse using url.ParseRequestURI or url.Parse
-* allow only http and https
-* reject empty host
-* reject URLs with username/password
-* reject unsupported schemes
-* cleanly join path with /reader-bundles
-* do not use fmt.Sprintf("%s/reader-bundles", targetURL)
-
-Use url.URL to build the final URL.
-
-Also add tests for:
-
-* valid http://localhost:8080
-* valid https://example.com/api
-* invalid file:///etc/passwd
-* invalid ftp://example.com
-* invalid empty target URL
-* invalid URL without host
+No fmt.Sprintf for SQL identifiers.
 
 After changes:
+Run gofmt.
+Run go test ./....
 
-Run:
-
-gofmt
-
-go test ./...
-
-Then show changed files and explain the fix.
-
-Important:
-Do not ignore or mark false positive.
-Actually change code so Cycode SAST can pass.
-
-⸻
-
-Also, after Copilot fixes it, check there is no SQL line like this:
-
-fmt.Sprintf("SELECT ... %s ...", table)
-
-and no URL line like this:
-
-fmt.Sprintf("%s/reader-bundles", inj.TargetURL)
+Show only changed lines and confirm function signatures were not changed.
