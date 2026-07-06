@@ -5,19 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 )
 
+// Injector sends ProtoReaderBundle payloads to a target Resonate instance.
 type Injector struct {
 	TargetURL  string
 	HTTPClient *http.Client
 }
 
+// NewInjector creates a new HTTP injector for the given target URL.
 func NewInjector(targetURL string) *Injector {
 	return &Injector{
 		TargetURL: targetURL,
@@ -27,6 +27,11 @@ func NewInjector(targetURL string) *Injector {
 	}
 }
 
+// buildReaderBundlesURL validates the target URL and returns a safe,
+// allowlisted /reader-bundles endpoint.
+//
+// This is intentionally strict for the MVP/demo.
+// It only allows the local mock target server.
 func buildReaderBundlesURL(targetURL string) (string, error) {
 	if strings.TrimSpace(targetURL) == "" {
 		return "", fmt.Errorf("target URL must not be empty")
@@ -37,75 +42,35 @@ func buildReaderBundlesURL(targetURL string) (string, error) {
 		return "", fmt.Errorf("invalid target URL: %w", err)
 	}
 
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", fmt.Errorf("unsupported URL scheme: %s", parsed.Scheme)
-	}
-
-	if parsed.Host == "" {
-		return "", fmt.Errorf("target URL must include a host")
-	}
-
 	if parsed.User != nil {
 		return "", fmt.Errorf("target URL must not contain credentials")
 	}
 
-	host := parsed.Hostname()
-	if !isAllowedTargetHost(host) {
-		return "", fmt.Errorf("target host is not allowed: %s", host)
+	if parsed.Path != "" && parsed.Path != "/" {
+		return "", fmt.Errorf("target URL path is not allowed")
 	}
 
-	endpoint := url.URL{
-		Scheme: parsed.Scheme,
-		Host:   parsed.Host,
-		Path:   "/reader-bundles",
-	}
+	host := strings.ToLower(parsed.Hostname())
+	port := parsed.Port()
 
-	return endpoint.String(), nil
+	switch {
+	case parsed.Scheme == "http" &&
+		host == "localhost" &&
+		port == "8080":
+		return "http://localhost:8080/reader-bundles", nil
+
+	case parsed.Scheme == "http" &&
+		host == "127.0.0.1" &&
+		port == "8080":
+		return "http://127.0.0.1:8080/reader-bundles", nil
+
+	default:
+		return "", fmt.Errorf("target URL is not allowed: %s", targetURL)
+	}
 }
 
-func isAllowedTargetHost(host string) bool {
-	host = strings.ToLower(strings.TrimSpace(host))
-
-	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-		return true
-	}
-
-	allowedHosts := os.Getenv("RRE_ALLOWED_TARGET_HOSTS")
-	if allowedHosts == "" {
-		return false
-	}
-
-	for _, allowed := range strings.Split(allowedHosts, ",") {
-		allowed = strings.ToLower(strings.TrimSpace(allowed))
-		if allowed == "" {
-			continue
-		}
-
-		if host == allowed {
-			return true
-		}
-
-		if strings.HasPrefix(allowed, ".") &&
-			strings.HasSuffix(host, allowed) {
-			return true
-		}
-	}
-
-	ip := net.ParseIP(host)
-	if ip != nil {
-		for _, allowed := range strings.Split(allowedHosts, ",") {
-			allowed = strings.TrimSpace(allowed)
-
-			_, cidr, err := net.ParseCIDR(allowed)
-			if err == nil && cidr.Contains(ip) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
+// Send posts a ProtoReaderBundle payload to the target endpoint.
+// Endpoint: POST /reader-bundles
 func (inj *Injector) Send(payload *ProtoReaderBundleWrapper) error {
 	jsonBytes, err := json.Marshal(payload)
 	if err != nil {
