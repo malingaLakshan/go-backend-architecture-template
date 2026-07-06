@@ -1,72 +1,93 @@
-Please fix the GitHub PR security scan issues only.
+Copilot Agent, fix the remaining Cycode SAST failures exactly at:
 
-Context:
-This is a Go CLI MVP for the Resonate Replay Engine.
-The failing scan is from Cycode SAST.
+internal/recording/repository.go line 181
+internal/replay/injector.go line 92
 
-Detected issues:
+Do not make large changes. Keep behavior same.
 
-1. SSRF risk in internal/replay/injector.go
-    because TargetURL is used to build an HTTP request.
-2. SQL injection risk in
-    internal/recording/repository.go
-    because table/column names are used with fmt.Sprintf.
+Issue 1: repository.go SQL injection
 
-Important:
-Do not change the main replay behavior.
-Do not change command names.
-Do not change output format unless required.
-Do not add large new architecture changes.
-Keep the fix small, safe, and review-friendly.
+Cycode still detects unsafe SQL because the code still builds SQL using dynamic table/column values.
 
-Required fix 1:
-For injector.go, validate and sanitize the target URL
-before creating the POST request.
+Fix this by removing generic dynamic SQL for the scanned functions.
 
-Allow only http and https schemes.
-Reject empty host.
-Reject unsupported schemes like file, ftp, gopher, etc.
-Build the final /reader-bundles URL using net/url,
-not simple string formatting.
-Avoid path traversal or malformed URL issues.
-Keep the existing 30 second HTTP timeout.
+For CountTable, do not use:
 
-Required fix 2:
-For repository.go, remove unsafe dynamic SQL.
+fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
 
-For CountTable, do not accept arbitrary table names.
-Use a whitelist of allowed table names, for example:
-RecordingSession, SiteInformation, RawReads,
-ResonateEvents, Snapshots, SnapshotTagLocations,
-MLT_SO_Locations.
+Instead, use a switch statement and hardcoded SQL per allowed table.
 
-Only build the SQL query after checking the table name
-against the whitelist.
+Example style:
 
-For GetUniqueCount, do not accept arbitrary table or
-column names.
-Use a whitelist of allowed table + column combinations.
-Only allow the combinations actually used by the summary
-feature, such as RawReads.TagID and RawReads.ReaderID.
+case "RawReads": query = "SELECT COUNT(*) FROM RawReads"
 
-Do not use user-provided values directly in SQL identifiers.
+Do the same for all allowed internal tables.
+
+For GetUniqueCount, do not build SQL using dynamic table or column names.
+
+Use hardcoded switch cases for allowed combinations only.
+
+Example:
+
+case table == "RawReads" && column == "TagID": query = "SELECT COUNT(DISTINCT TagID) FROM RawReads WHERE RecordingSessionID = ?"
+
+case table == "RawReads" && column == "ReaderID": query = "SELECT COUNT(DISTINCT ReaderID) FROM RawReads WHERE RecordingSessionID = ?"
+
+Return an error for unsupported table/column.
+
+Goal: no fmt.Sprintf for SQL identifiers in these functions.
+
+Issue 2: injector.go SSRF
+
+Cycode still detects SSRF because request URL is created from TargetURL.
+
+Fix by adding strict target URL validation before http.NewRequest.
+
+Create a helper like:
+
+buildReaderBundlesURL(targetURL string) (string, error)
+
+Inside it:
+
+* parse using url.ParseRequestURI or url.Parse
+* allow only http and https
+* reject empty host
+* reject URLs with username/password
+* reject unsupported schemes
+* cleanly join path with /reader-bundles
+* do not use fmt.Sprintf("%s/reader-bundles", targetURL)
+
+Use url.URL to build the final URL.
+
+Also add tests for:
+
+* valid http://localhost:8080
+* valid https://example.com/api
+* invalid file:///etc/passwd
+* invalid ftp://example.com
+* invalid empty target URL
+* invalid URL without host
 
 After changes:
-Run gofmt.
-Run go test ./....
-Show me the exact files changed and a short explanation.
 
-Goal:
-Make Cycode SAST pass while keeping the replay engine
-behavior the same.
+Run:
+
+gofmt
+
+go test ./...
+
+Then show changed files and explain the fix.
+
+Important:
+Do not ignore or mark false positive.
+Actually change code so Cycode SAST can pass.
 
 ⸻
 
-After Copilot changes, check these two files mainly:
+Also, after Copilot fixes it, check there is no SQL line like this:
 
-internal/replay/injector.go
-internal/recording/repository.go
+fmt.Sprintf("SELECT ... %s ...", table)
 
-For GitHub comment, after fixing you can write:
+and no URL line like this:
 
-Fixed the Cycode SAST findings by validating target URLs before HTTP requests and restricting dynamic SQL identifiers to internal whitelists.
+fmt.Sprintf("%s/reader-bundles", inj.TargetURL)
