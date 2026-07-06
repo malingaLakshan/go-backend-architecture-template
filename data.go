@@ -1,84 +1,106 @@
-Copilot Agent, do minimal changes only.
+package replay
 
-Very important:
-Do not change existing function names.
-Do not change function signatures.
-Do not change return types.
-Do not change command behavior.
-Do not refactor service architecture.
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"time"
+)
 
-Only fix Cycode SAST issues with the smallest possible changes.
+// Injector sends ProtoReaderBundle payloads to a target Resonate instance.
+type Injector struct {
+	TargetURL  string
+	HTTPClient *http.Client
+}
 
-Issue 1: internal/replay/injector.go
-Cycode reports SSRF in HTTP request.
+// buildReaderBundlesURL validates the targetURL and returns the safe
+// /reader-bundles endpoint.
+// Only http and https are allowed. The final path is hardcoded.
+func buildReaderBundlesURL(targetURL string) (string, error) {
+	if targetURL == "" {
+		return "", fmt.Errorf("target URL must not be empty")
+	}
 
-Keep:
+	parsed, err := url.Parse(targetURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid target URL: %w", err)
+	}
 
-func NewInjector(targetURL string) *Injector
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", fmt.Errorf(
+			"unsupported URL scheme %q: only http and https are allowed",
+			parsed.Scheme,
+		)
+	}
 
-Keep:
+	if parsed.Host == "" {
+		return "", fmt.Errorf("target URL must include a host")
+	}
 
-func (inj *Injector) Send(payload *ProtoReaderBundleWrapper) error
+	if parsed.User != nil {
+		return "", fmt.Errorf("target URL must not contain credentials")
+	}
 
-Inside Send, before http.NewRequest, validate and build the endpoint using a helper.
+	endpoint := &url.URL{
+		Scheme: parsed.Scheme,
+		Host:   parsed.Host,
+		Path:   "/reader-bundles",
+	}
 
-Do not use:
+	return endpoint.String(), nil
+}
 
-fmt.Sprintf("%s/reader-bundles", inj.TargetURL)
+// NewInjector creates a new HTTP injector for the given target URL.
+func NewInjector(targetURL string) *Injector {
+	return &Injector{
+		TargetURL: targetURL,
+		HTTPClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
 
-Instead:
+// Send posts a ProtoReaderBundle payload to the target endpoint.
+// Endpoint: POST /reader-bundles
+func (inj *Injector) Send(payload *ProtoReaderBundleWrapper) error {
+	jsonBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
 
-* parse inj.TargetURL using net/url
-* allow only http and https
-* reject empty host
-* reject URL with username/password
-* build final endpoint using url.URL
-* hardcode path as /reader-bundles
-* pass only the validated endpoint string to http.NewRequest
+	endpoint, err := buildReaderBundlesURL(inj.TargetURL)
+	if err != nil {
+		return fmt.Errorf("invalid target URL: %w", err)
+	}
 
-Keep the existing behavior and timeout.
+	req, err := http.NewRequest(
+		http.MethodPost,
+		endpoint,
+		bytes.NewReader(jsonBytes),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
 
-Issue 2: internal/recording/repository.go
-Cycode reports SQL injection.
+	req.Header.Set("Content-Type", "application/json")
 
-Do not change function signatures.
+	resp, err := inj.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send payload to %s: %w", endpoint, err)
+	}
+	defer resp.Body.Close()
 
-Keep existing functions:
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf(
+			"target returned status %d: %s",
+			resp.StatusCode,
+			string(body),
+		)
+	}
 
-CountTable(...)
-
-GetUniqueCount(...)
-
-But inside them, remove SQL identifier fmt.Sprintf.
-
-For CountTable, use a switch with hardcoded SQL strings.
-
-Example:
-
-case “RawReads”:
-query = “SELECT COUNT(*) FROM RawReads”
-
-case “RecordingSession”:
-query = “SELECT COUNT(*) FROM RecordingSession”
-
-Return error for unsupported table.
-
-For GetUniqueCount, use hardcoded table + column combinations only.
-
-Example:
-
-case table == “RawReads” && column == “TagID”:
-query = “SELECT COUNT(DISTINCT TagID) FROM RawReads WHERE RecordingSessionID = ?”
-
-case table == “RawReads” && column == “ReaderID”:
-query = “SELECT COUNT(DISTINCT ReaderID) FROM RawReads WHERE RecordingSessionID = ?”
-
-Return error for unsupported combination.
-
-No fmt.Sprintf for SQL identifiers.
-
-After changes:
-Run gofmt.
-Run go test ./....
-
-Show only changed lines and confirm function signatures were not changed.
+	return nil
+}
