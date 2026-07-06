@@ -36,8 +36,7 @@ func NewInjector(targetURL string) *Injector {
 }
 
 // validateAllowedTarget validates the input target URL and returns
-// an internal allowlist key. For the MVP, only the local mock server
-// is allowed.
+// an internal allowlist key. For this MVP, only the local mock server is allowed.
 func validateAllowedTarget(targetURL string) (string, error) {
 	if strings.TrimSpace(targetURL) == "" {
 		return "", fmt.Errorf("target URL must not be empty")
@@ -135,7 +134,24 @@ func (inj *Injector) sendToLocalhost(jsonBytes []byte) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	return inj.executeRequest(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := inj.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send payload: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf(
+			"target returned status %d: %s",
+			resp.StatusCode,
+			string(body),
+		)
+	}
+
+	return nil
 }
 
 func (inj *Injector) sendToLoopback(jsonBytes []byte) error {
@@ -148,10 +164,6 @@ func (inj *Injector) sendToLoopback(jsonBytes []byte) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	return inj.executeRequest(req)
-}
-
-func (inj *Injector) executeRequest(req *http.Request) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := inj.HTTPClient.Do(req)
