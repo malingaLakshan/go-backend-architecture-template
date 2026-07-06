@@ -11,6 +11,14 @@ import (
 	"time"
 )
 
+const (
+	targetLocalhost = "localhost"
+	targetLoopback  = "127.0.0.1"
+
+	readerBundlesLocalhost = "http://localhost:8080/reader-bundles"
+	readerBundlesLoopback  = "http://127.0.0.1:8080/reader-bundles"
+)
+
 // Injector sends ProtoReaderBundle payloads to a target Resonate instance.
 type Injector struct {
 	TargetURL  string
@@ -27,12 +35,9 @@ func NewInjector(targetURL string) *Injector {
 	}
 }
 
-// buildReaderBundlesURL validates the target URL and returns a safe,
-// allowlisted /reader-bundles endpoint.
-//
-// This is intentionally strict for the MVP/demo.
-// It only allows the local mock target server.
-func buildReaderBundlesURL(targetURL string) (string, error) {
+// validateAllowedTarget validates the target URL and returns an internal
+// allowlist key. This MVP intentionally allows only the local mock target.
+func validateAllowedTarget(targetURL string) (string, error) {
 	if strings.TrimSpace(targetURL) == "" {
 		return "", fmt.Errorf("target URL must not be empty")
 	}
@@ -42,30 +47,58 @@ func buildReaderBundlesURL(targetURL string) (string, error) {
 		return "", fmt.Errorf("invalid target URL: %w", err)
 	}
 
+	if parsed.Scheme != "http" {
+		return "", fmt.Errorf("unsupported target URL scheme: %s", parsed.Scheme)
+	}
+
 	if parsed.User != nil {
 		return "", fmt.Errorf("target URL must not contain credentials")
+	}
+
+	if parsed.Host == "" {
+		return "", fmt.Errorf("target URL must include a host")
 	}
 
 	if parsed.Path != "" && parsed.Path != "/" {
 		return "", fmt.Errorf("target URL path is not allowed")
 	}
 
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", fmt.Errorf("target URL query or fragment is not allowed")
+	}
+
 	host := strings.ToLower(parsed.Hostname())
 	port := parsed.Port()
 
 	switch {
-	case parsed.Scheme == "http" &&
-		host == "localhost" &&
-		port == "8080":
-		return "http://localhost:8080/reader-bundles", nil
+	case host == "localhost" && port == "8080":
+		return targetLocalhost, nil
 
-	case parsed.Scheme == "http" &&
-		host == "127.0.0.1" &&
-		port == "8080":
-		return "http://127.0.0.1:8080/reader-bundles", nil
+	case host == "127.0.0.1" && port == "8080":
+		return targetLoopback, nil
 
 	default:
-		return "", fmt.Errorf("target URL is not allowed: %s", targetURL)
+		return "", fmt.Errorf("target URL is not allowlisted")
+	}
+}
+
+// buildReaderBundlesURL returns the final allowlisted reader-bundles endpoint.
+// This function is kept for tests and internal validation.
+func buildReaderBundlesURL(targetURL string) (string, error) {
+	target, err := validateAllowedTarget(targetURL)
+	if err != nil {
+		return "", err
+	}
+
+	switch target {
+	case targetLocalhost:
+		return readerBundlesLocalhost, nil
+
+	case targetLoopback:
+		return readerBundlesLoopback, nil
+
+	default:
+		return "", fmt.Errorf("target URL is not allowlisted")
 	}
 }
 
@@ -77,16 +110,32 @@ func (inj *Injector) Send(payload *ProtoReaderBundleWrapper) error {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	endpoint, err := buildReaderBundlesURL(inj.TargetURL)
+	target, err := validateAllowedTarget(inj.TargetURL)
 	if err != nil {
 		return fmt.Errorf("invalid target URL: %w", err)
 	}
 
-	req, err := http.NewRequest(
-		http.MethodPost,
-		endpoint,
-		bytes.NewReader(jsonBytes),
-	)
+	var req *http.Request
+
+	switch target {
+	case targetLocalhost:
+		req, err = http.NewRequest(
+			http.MethodPost,
+			readerBundlesLocalhost,
+			bytes.NewReader(jsonBytes),
+		)
+
+	case targetLoopback:
+		req, err = http.NewRequest(
+			http.MethodPost,
+			readerBundlesLoopback,
+			bytes.NewReader(jsonBytes),
+		)
+
+	default:
+		return fmt.Errorf("target URL is not allowlisted")
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -95,7 +144,7 @@ func (inj *Injector) Send(payload *ProtoReaderBundleWrapper) error {
 
 	resp, err := inj.HTTPClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send payload to %s: %w", endpoint, err)
+		return fmt.Errorf("failed to send payload: %w", err)
 	}
 	defer resp.Body.Close()
 
