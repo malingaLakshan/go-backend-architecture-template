@@ -35,8 +35,9 @@ func NewInjector(targetURL string) *Injector {
 	}
 }
 
-// validateAllowedTarget validates the target URL and returns an internal
-// allowlist key. This MVP intentionally allows only the local mock target.
+// validateAllowedTarget validates the input target URL and returns
+// an internal allowlist key. For the MVP, only the local mock server
+// is allowed.
 func validateAllowedTarget(targetURL string) (string, error) {
 	if strings.TrimSpace(targetURL) == "" {
 		return "", fmt.Errorf("target URL must not be empty")
@@ -70,20 +71,19 @@ func validateAllowedTarget(targetURL string) (string, error) {
 	host := strings.ToLower(parsed.Hostname())
 	port := parsed.Port()
 
-	switch {
-	case host == "localhost" && port == "8080":
+	if host == "localhost" && port == "8080" {
 		return targetLocalhost, nil
-
-	case host == "127.0.0.1" && port == "8080":
-		return targetLoopback, nil
-
-	default:
-		return "", fmt.Errorf("target URL is not allowlisted")
 	}
+
+	if host == "127.0.0.1" && port == "8080" {
+		return targetLoopback, nil
+	}
+
+	return "", fmt.Errorf("target URL is not allowlisted")
 }
 
-// buildReaderBundlesURL returns the final allowlisted reader-bundles endpoint.
-// This function is kept for tests and internal validation.
+// buildReaderBundlesURL is kept for tests and validation.
+// It returns only hardcoded allowlisted endpoints.
 func buildReaderBundlesURL(targetURL string) (string, error) {
 	target, err := validateAllowedTarget(targetURL)
 	if err != nil {
@@ -93,10 +93,8 @@ func buildReaderBundlesURL(targetURL string) (string, error) {
 	switch target {
 	case targetLocalhost:
 		return readerBundlesLocalhost, nil
-
 	case targetLoopback:
 		return readerBundlesLoopback, nil
-
 	default:
 		return "", fmt.Errorf("target URL is not allowlisted")
 	}
@@ -115,27 +113,32 @@ func (inj *Injector) Send(payload *ProtoReaderBundleWrapper) error {
 		return fmt.Errorf("invalid target URL: %w", err)
 	}
 
-	var req *http.Request
-
 	switch target {
 	case targetLocalhost:
-		req, err = http.NewRequest(
-			http.MethodPost,
-			readerBundlesLocalhost,
-			bytes.NewReader(jsonBytes),
-		)
+		return inj.sendToLocalhost(jsonBytes)
 
 	case targetLoopback:
-		req, err = http.NewRequest(
-			http.MethodPost,
-			readerBundlesLoopback,
-			bytes.NewReader(jsonBytes),
-		)
+		return inj.sendToLoopback(jsonBytes)
 
 	default:
 		return fmt.Errorf("target URL is not allowlisted")
 	}
+}
 
+func (inj *Injector) sendToLocalhost(jsonBytes []byte) error {
+	return inj.sendJSON(readerBundlesLocalhost, jsonBytes)
+}
+
+func (inj *Injector) sendToLoopback(jsonBytes []byte) error {
+	return inj.sendJSON(readerBundlesLoopback, jsonBytes)
+}
+
+func (inj *Injector) sendJSON(endpoint string, jsonBytes []byte) error {
+	req, err := http.NewRequest(
+		http.MethodPost,
+		endpoint,
+		bytes.NewReader(jsonBytes),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
