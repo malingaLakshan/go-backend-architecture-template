@@ -1,12 +1,14 @@
-func runMockServer(flags *Flags) int {
-	if flags.Config != "" {
-		return runMockServerWithConfig(flags)
+// Config-based mode: serve the pre-loaded site config when set.
+// Do not compare requested siteId here.
+// QA may intentionally provide a mismatched config to test validation failure.
+var config *site.SiteConfig
+if h.siteConfig != nil {
+	fmt.Printf("[INFO] Serving configured mock site config: %s\n", h.siteConfig.SiteID)
+	config = h.siteConfig
+} else {
+	config = getMockSiteConfig(siteID)
+	if config == nil {
+		http.Error(w, fmt.Sprintf("site not found: %s", siteID), http.StatusNotFound)
+		return
 	}
-
-	if err := mocktarget.StartServer(flags.Port); err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] %v\n", err)
-		return 1
-	}
-
-	return 0
 }
