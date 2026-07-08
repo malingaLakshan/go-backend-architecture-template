@@ -1,3 +1,20 @@
-Hi team, sorry I missed today’s standup. I came to office today and missed the meeting since most of the team was working from home.
+// RawRead represents a single recorded RFID raw read.
+type RawRead struct {
+	ReadID             string
+	RecordingSessionID string
+	TagID              string
+	ReaderID           string
+	AntennaID          int
+	AntennaTypeID      int
+	SourceTimestampUtc string
+	InjectionTimeUtc   string
+	Confidence         int
+	RSSI               float64
+	TagX               float64
+	TagY               float64
+	FloorID            int
+	RawPayload         []byte
 
-Yesterday I started working on syncing the replay engine with the real recorder SQLite database instead of the generated sample DB. I checked the real RawReads and SiteInformation schemas, identified the column differences, and started updating the repository/model mapping and mock target validation flow accordingly. Today I’ll continue fixing the real DB integration and testing the validate/play flow.
+	Timestamp     time.Time
+	InjectionTime time.Time
+}
