@@ -1,64 +1,74 @@
-for rows.Next() {
-	var r RawRead
+func BuildPayload(
+	rawRead *recording.RawRead,
+	siteID string,
+) (*ProtoReaderBundleWrapper, error) {
 
-	var rssi sql.NullFloat64
-	var tagX sql.NullFloat64
-	var tagY sql.NullFloat64
-	var floorID sql.NullInt64
-	var confidence sql.NullInt64
-	var antennaID sql.NullInt64
-	var antennaType sql.NullInt64
+	// First try old/sample JSON RawPayload.
+	// This keeps generated sample DB support.
+	if len(rawRead.RawPayload) > 0 {
+		var payloadData RawPayloadData
 
-	err := rows.Scan(
-		&r.ReadID,
-		&r.RecordingSessionID,
-		&r.TagID,
-		&r.ReaderID,
-		&antennaID,
-		&antennaType,
-		&r.SourceTimestampUtc,
-		&r.InjectionTimeUtc,
-		&confidence,
-		&rssi,
-		&tagX,
-		&tagY,
-		&floorID,
-		&r.RawPayload,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to scan raw read: %w", err)
+		if err := json.Unmarshal(rawRead.RawPayload, &payloadData); err == nil &&
+			len(payloadData.Reads) > 0 {
+
+			var reads []ProtoRead
+			for _, readMap := range payloadData.Reads {
+				pr := ProtoRead{
+					TimestampNs: toInt64(readMap["timestamp_ns"]),
+					Confidence:  toInt(readMap["confidence"]),
+					AntennaID:   toInt(readMap["antenna_id"]),
+					AntennaType: toInt(readMap["antenna_type"]),
+					X:           toFloat64(readMap["x"]),
+					Y:           toFloat64(readMap["y"]),
+					ItemID:      toString(readMap["item_id"]),
+					FloorID:     toInt(readMap["floor_id"]),
+				}
+
+				reads = append(reads, pr)
+			}
+
+			bundleSiteID := payloadData.SiteID
+			if bundleSiteID == "" {
+				bundleSiteID = siteID
+			}
+
+			sentTimestamp := payloadData.SentTimestampMs
+			if sentTimestamp == 0 {
+				sentTimestamp = rawRead.InjectionTime.UnixMilli()
+			}
+
+			return &ProtoReaderBundleWrapper{
+				ProtoReaderBundle: ProtoReaderBundle{
+					ReaderID:        payloadData.ReaderID,
+					Reads:           reads,
+					SiteID:          bundleSiteID,
+					SentTimestampMs: sentTimestamp,
+				},
+			}, nil
+		}
 	}
 
-	if antennaID.Valid {
-		r.AntennaID = int(antennaID.Int64)
+	// Real Recorder DB path:
+	// raw_payload is binary, so build payload from RawReads columns.
+	read := ProtoRead{
+		TimestampNs: rawRead.Timestamp.UnixNano(),
+		Confidence:  rawRead.Confidence,
+		AntennaID:   rawRead.AntennaID,
+		AntennaType: rawRead.AntennaTypeID,
+		X:           rawRead.TagX,
+		Y:           rawRead.TagY,
+		ItemID:      rawRead.TagID,
+		FloorID:     rawRead.FloorID,
 	}
 
-	if antennaType.Valid {
-		r.AntennaTypeID = int(antennaType.Int64)
-	}
+	readerID := toInt(rawRead.ReaderID)
 
-	if confidence.Valid {
-		r.Confidence = int(confidence.Int64)
-	}
-
-	if rssi.Valid {
-		r.RSSI = rssi.Float64
-	}
-
-	if tagX.Valid {
-		r.TagX = tagX.Float64
-	}
-
-	if tagY.Valid {
-		r.TagY = tagY.Float64
-	}
-
-	if floorID.Valid {
-		r.FloorID = int(floorID.Int64)
-	}
-
-	r.Timestamp, _ = parseTime(r.SourceTimestampUtc)
-	r.InjectionTime, _ = parseTime(r.InjectionTimeUtc)
-
-	reads = append(reads, r)
+	return &ProtoReaderBundleWrapper{
+		ProtoReaderBundle: ProtoReaderBundle{
+			ReaderID:        readerID,
+			Reads:           []ProtoRead{read},
+			SiteID:          siteID,
+			SentTimestampMs: rawRead.InjectionTime.UnixMilli(),
+		},
+	}, nil
 }
