@@ -1,1 +1,1 @@
-git pull --rebase origin feat/real-recorder-sqlite-sync
+git push --set-upstream origin feat/real-recorder-sqlite-sync
