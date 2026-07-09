@@ -1,1 +1,1 @@
-git branch backup-real-recorder-sync-before-pull
+git pull --rebase origin feat/real-recorder-sqlite-sync
