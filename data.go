@@ -1,1 +1,20 @@
-git rm -f --ignore-unmatch resonate-replay-engine/internal/config/model.go.4214142988847495839
+git add resonate-replay-engine/README.md
+git add resonate-replay-engine/configs/pass_config.json
+git add resonate-replay-engine/configs/fail_config.json
+git add resonate-replay-engine/configs/wrong_site_config.json
+
+git add resonate-replay-engine/internal/config/model.go
+git add resonate-replay-engine/internal/cli/args.go
+git add resonate-replay-engine/internal/cli/commands.go
+git add resonate-replay-engine/internal/mocktarget/handler.go
+git add resonate-replay-engine/internal/mocktarget/server.go
+git add resonate-replay-engine/internal/recording/model.go
+git add resonate-replay-engine/internal/recording/repository.go
+git add resonate-replay-engine/internal/recording/summary.go
+git add resonate-replay-engine/internal/replay/payload.go
+git add resonate-replay-engine/internal/replay/payload_test.go
+git add resonate-replay-engine/internal/site/model.go
+git add resonate-replay-engine/internal/site/validator.go
+git add resonate-replay-engine/internal/site/validator_test.go
+git add resonate-replay-engine/internal/sqlite/schema.go
+git add resonate-replay-engine/internal/sqlite/sample_data.go
