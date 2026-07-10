@@ -1,252 +1,287 @@
-Now real Recorder SQLite schema support is restored. Next, fix the full config-based RRE CLI flow and validation behavior.
+Please finalize the real Recorder SQLite schema integration for resonate-replay-engine.
 
-Context:
-Project folder is resonate-replay-engine.
-Executable is rre.exe.
-CLI name in help should be rre.
-Real Recorder SQLite schema is already supported using snake_case columns.
-Do not revert repository/model/schema back to old camelCase sample schema.
+Important:
+Do not guess column names.
+Do not use old camelCase DB columns.
+Do not use test_description. Real column is description.
+Do not create temporary duplicate files.
+Do not commit logs, sqlite runtime side files, exe files, or generated output files.
+Avoid Cycode/SAST issues: do not build SQL using fmt.Sprintf or string concatenation for table/column names. Use hardcoded SQL queries only.
 
-Please fix all related files carefully.
+Real SQLite schema from Recorder DB:
 
-1. CLI config support
+RecordingSession columns:
+- recording_session_id TEXT
+- test_name TEXT
+- environment TEXT
+- tester_name TEXT
+- description TEXT
+- start_time_utc TEXT
+- end_time_utc TEXT
+- resonate_build_number TEXT
+- firmware_build_number TEXT
+- reader_apps_build_number TEXT
+- resonate_site_id TEXT
+- state TEXT
 
-Update internal/cli/args.go.
+RawReads columns:
+- read_id TEXT
+- recording_session_id TEXT
+- tag_id TEXT
+- reader_id TEXT
+- antenna_id INTEGER
+- antenna_type INTEGER
+- source_timestamp_utc TEXT
+- injection_time_utc TEXT
+- confidence INTEGER
+- rssi REAL
+- tag_x INTEGER/REAL
+- tag_y INTEGER/REAL
+- floor_id INTEGER
+- raw_payload BLOB
 
-Flags struct must include:
+SiteInformation columns:
+- site_information_id TEXT
+- recording_session_id TEXT
+- site_id TEXT
+- site_name TEXT
+- site_json BLOB
 
-type Flags struct {
-    Command   string
-    File      string
-    Out       string
-    TargetURL string
-    SiteID    string
-    Port      int
-    Config    string
-}
+ResonateEvents columns:
+- event_id TEXT
+- recording_session_id TEXT
+- tag_id TEXT
+- event_type TEXT
+- event_reason TEXT
+- source_timestamp_utc TEXT
+- injection_time_utc TEXT
+- floor INTEGER
+- x INTEGER
+- y INTEGER
+- z INTEGER
+- region INTEGER
+- event_details TEXT
+- raw_payload BLOB
 
-Add -config flag support for:
+MLT_SOW_Locations columns:
+- location_id TEXT
+- recording_session_id TEXT
+- tag_id TEXT
+- source_timestamp_utc TEXT
+- injection_time_utc TEXT
+- floor INTEGER
+- x INTEGER
+- y INTEGER
+- z INTEGER
+- region INTEGER
+- state TEXT
+- confidence REAL
+- raw_payload BLOB
+
+Snapshots columns:
+- snapshot_id TEXT
+- recording_session_id TEXT
+- timestamp_utc TEXT
+- snapshot_name TEXT
+
+SnapshotTagLocations columns:
+- snapshot_tag_location_id TEXT
+- snapshot_id TEXT
+- tag_id TEXT
+- x INTEGER
+- y INTEGER
+- z INTEGER
+- floor INTEGER
+- region INTEGER
+- state TEXT
+
+Task 1: Fix recording models
+
+Update internal/recording/model.go to match real schema.
+
+RecordingSession should map:
+- RecordingSessionID <= recording_session_id
+- TestName <= test_name
+- Environment <= environment
+- TesterName <= tester_name
+- Description <= description
+- StartTimeUTC <= start_time_utc parsed into time.Time
+- EndTimeUTC <= end_time_utc parsed into time.Time
+- ResonateBuildNumber <= resonate_build_number
+- FirmwareBuildNumber <= firmware_build_number
+- ReaderAppsBuildNumber <= reader_apps_build_number
+- ResonateSiteID <= resonate_site_id
+- State <= state
+
+RawRead should map:
+- ReadID string <= read_id
+- RecordingSessionID string <= recording_session_id
+- TagID string <= tag_id
+- ReaderID string <= reader_id
+- AntennaID int <= antenna_id
+- AntennaTypeID int <= antenna_type
+- SourceTimestampUtc string <= source_timestamp_utc
+- InjectionTimeUtc string <= injection_time_utc
+- Confidence int <= confidence
+- RSSI float64 <= rssi
+- TagX float64 <= tag_x
+- TagY float64 <= tag_y
+- FloorID int <= floor_id
+- RawPayload []byte <= raw_payload
+- Timestamp time.Time parsed from source_timestamp_utc
+- InjectionTime time.Time parsed from injection_time_utc
+
+SiteInformation should map:
+- SiteInformationID string <= site_information_id
+- RecordingSessionID string <= recording_session_id
+- SiteID string <= site_id
+- SiteName string <= site_name
+- SiteJSON []byte <= site_json
+
+Task 2: Fix repository queries
+
+Update internal/recording/repository.go.
+
+All SQL must use the real snake_case columns.
+
+GetSession must use:
+
+SELECT recording_session_id,
+       test_name,
+       environment,
+       tester_name,
+       description,
+       start_time_utc,
+       end_time_utc,
+       resonate_build_number,
+       firmware_build_number,
+       reader_apps_build_number,
+       resonate_site_id,
+       state
+FROM RecordingSession
+WHERE recording_session_id = ?
+
+Do not use RecordingSessionID.
+Do not use TestDescription.
+Do not use test_description.
+Do not use SiteID.
+Use description and resonate_site_id.
+
+GetFirstSession must use the same real columns and:
+FROM RecordingSession
+LIMIT 1
+
+GetSiteInfo must use:
+
+SELECT site_information_id,
+       recording_session_id,
+       site_id,
+       site_name,
+       site_json
+FROM SiteInformation
+WHERE site_id = ?
+
+GetRawReads must use:
+
+SELECT read_id,
+       recording_session_id,
+       tag_id,
+       reader_id,
+       antenna_id,
+       antenna_type,
+       source_timestamp_utc,
+       injection_time_utc,
+       confidence,
+       rssi,
+       tag_x,
+       tag_y,
+       floor_id,
+       raw_payload
+FROM RawReads
+WHERE recording_session_id = ?
+ORDER BY injection_time_utc ASC, read_id ASC
+
+GetRawReadTimeRange must use:
+
+SELECT MIN(injection_time_utc),
+       MAX(injection_time_utc)
+FROM RawReads
+WHERE recording_session_id = ?
+
+GetUniqueCount must not build SQL dynamically.
+Use hardcoded allowed switch cases only:
+
+- table == "RawReads" and column == "tag_id"
+  SELECT COUNT(DISTINCT tag_id) FROM RawReads WHERE recording_session_id = ?
+
+- table == "RawReads" and column == "reader_id"
+  SELECT COUNT(DISTINCT reader_id) FROM RawReads WHERE recording_session_id = ?
+
+Also support legacy caller input safely:
+- "TagID" should map to tag_id query
+- "ReaderID" should map to reader_id query
+
+But still do not use dynamic SQL.
+
+Task 3: Fix summary
+
+Update internal/recording/summary.go.
+
+Summary must use real columns and real functions.
+Do not use old column names.
+
+Summary must show:
+- Recording Session ID
+- Test Name
+- Environment
+- Tester Name
+- Description
+- Start Time
+- End Time
+- Resonate Build Number
+- Firmware Build Number
+- Reader Apps Build Number
+- Resonate Site ID
+- State
+- Total RawReads
+- Unique Tags
+- Unique Readers
+- First Injection Time
+- Last Injection Time
+
+summary command must work with direct file:
+
+./rre.exe summary -file data/recording_001.sqlite
+
+summary command must also work with config:
+
+./rre.exe summary -config configs/pass_config.json
+
+For summary with config:
+- only recording_file is required
+- do not require target_url
+- do not require site_id
+
+Task 4: Fix config support
+
+Update internal/cli/args.go and internal/cli/commands.go.
+
+Flags must include Config string.
+
+-config must work for:
 - summary
 - validate
 - play
 - mock-server
 
-Direct flag commands must still work:
-
-./rre.exe summary -file data/recording_001.sqlite
-
-./rre.exe validate -file data/recording_001.sqlite -target-url http://localhost:8080 -site-id b3489888-aacf-4451-893c-d7d994240f93
-
-./rre.exe play -file data/recording_001.sqlite -target-url http://localhost:8080 -site-id b3489888-aacf-4451-893c-d7d994240f93
-
-./rre.exe mock-server -port 8080
-
-Config commands must work:
+Commands:
 
 ./rre.exe summary -config configs/pass_config.json
 ./rre.exe validate -config configs/pass_config.json
 ./rre.exe play -config configs/pass_config.json
 ./rre.exe mock-server -config configs/pass_config.json
 
-./rre.exe mock-server -config configs/fail_config.json
-./rre.exe validate -config configs/fail_config.json
-
--config must appear in command help:
-./rre.exe summary -help
-./rre.exe validate -help
-./rre.exe play -help
-./rre.exe mock-server -help
-
-2. Config model
-
-Create or fix internal/config/model.go.
-
-Use this config structure:
-
-type RunConfig struct {
-    RecordingFile string `json:"recording_file"`
-    TargetURL     string `json:"target_url"`
-    SiteID        string `json:"site_id"`
-    MockMode      string `json:"mock_mode"`
-    MockSiteFile  string `json:"mock_site_file"`
-}
-
-Load(path string) should:
-- read the JSON file
-- unmarshal into RunConfig
-- return helpful errors
-
-3. summary with config
-
-Update runSummary.
-
-Direct:
-./rre.exe summary -file data/recording_001.sqlite
-
-Config:
-./rre.exe summary -config configs/pass_config.json
-
-Behavior:
-- If -config is provided, load config file.
-- Use cfg.RecordingFile as flags.File.
-- summary does not need target_url, site_id, mock_mode, or mock_site_file.
-- If both -file and -config are missing, return:
-  [ERROR] -file or -config is required for summary
-
-Do not require site_id for summary.
-
-4. validate with config
-
-Update runValidate.
-
-Direct:
-./rre.exe validate -file data/recording_001.sqlite -target-url http://localhost:8080 -site-id b3489888-aacf-4451-893c-d7d994240f93
-
-Config:
-./rre.exe validate -config configs/pass_config.json
-
-Behavior:
-- If -config is provided, load config file.
-- Set flags.File = cfg.RecordingFile.
-- Set flags.TargetURL = cfg.TargetURL.
-- Set flags.SiteID = cfg.SiteID.
-- If required values are missing, return:
-  [ERROR] -file, -target-url, and -site-id are required for validate
-
-Validate flow:
-- Open SQLite recording file.
-- Load recorded site config from SiteInformation.site_json using site_id.
-- json.Unmarshal(siteInfo.SiteJSON, &recordedConfig)
-- Fetch target site config from GET /sites/{siteId}.
-- Validate recorded config vs target config.
-- Print recorded site config summary.
-- Print target site config summary.
-- If validation fails, print all mismatch errors and return exit code 1.
-- If validation passes, return exit code 0.
-
-Do not use RawSiteJSON anywhere.
-Error text should say SiteJSON.
-
-5. play with config
-
-Update runPlay.
-
-Direct:
-./rre.exe play -file data/recording_001.sqlite -target-url http://localhost:8080 -site-id b3489888-aacf-4451-893c-d7d994240f93
-
-Config:
-./rre.exe play -config configs/pass_config.json
-
-Behavior:
-- If -config is provided, load config file.
-- Set flags.File = cfg.RecordingFile.
-- Set flags.TargetURL = cfg.TargetURL.
-- Set flags.SiteID = cfg.SiteID.
-- If required values are missing, return:
-  [ERROR] -file, -target-url, and -site-id are required for play
-
-Play flow:
-- Validate recorded site config against target site config first.
-- Abort replay if validation fails.
-- Load RawReads from real Recorder SQLite schema.
-- Replay RawReads to POST /reader-bundles.
-- Use injection_time_utc pacing.
-- Write sender-side output to logs/replay_output.jsonl.
-
-6. mock-server with config
-
-Update runMockServer and runMockServerWithConfig.
-
-Direct:
-./rre.exe mock-server -port 8080
-
-Config:
-./rre.exe mock-server -config configs/pass_config.json
-./rre.exe mock-server -config configs/fail_config.json
-
-Behavior:
-- If no -config, start default mock server on selected port.
-- If -config exists, load config and use mock_mode.
-
-mock_mode = sqlite:
-- Requires recording_file and site_id.
-- Open recording_file.
-- Load SiteInformation.site_json by site_id.
-- Unmarshal into site.SiteConfig.
-- Start mock server using this exact SiteConfig.
-- This is the pass test mode.
-
-mock_mode = file:
-- Requires mock_site_file.
-- Read mock_site_file.
-- Unmarshal into site.SiteConfig.
-- Start mock server using this SiteConfig.
-- This is the fail test mode.
-
-Errors:
-- If mock_mode is not sqlite or file:
-  [ERROR] config mock_mode must be "sqlite" or "file"
-- If sqlite mode and recording_file missing:
-  [ERROR] config missing required field for sqlite mode: recording_file
-- If sqlite mode and site_id missing:
-  [ERROR] config missing required field for sqlite mode: site_id
-- If file mode and mock_site_file missing:
-  [ERROR] config missing required field for file mode: mock_site_file
-- If mock_site_file JSON is invalid, print clear JSON parse error.
-
-mock-server startup output should show:
-- loaded config path
-- mock mode
-- recording file or mock site file
-- site config source
-- site ID
-- site name
-- reader count
-- antenna count
-- floor count
-- region count
-- listening URL
-- endpoints
-- received payload log path
-
-7. mocktarget server/handler
-
-Update internal/mocktarget/server.go and handler.go.
-
-Support:
-
-func StartServer(port int) error
-func StartServerWithConfig(port int, cfg *site.SiteConfig) error
-
-Handler support:
-func NewHandler(paths ...string) (*Handler, error)
-func NewHandlerWithConfig(cfg *site.SiteConfig, paths ...string) (*Handler, error)
-
-GET /sites/{siteId}:
-- If handler has siteConfig:
-  - If requested siteId equals siteConfig.SiteID, return that config as JSON.
-  - If requested siteId does not match, return 404.
-- If handler has no siteConfig:
-  - Return default fallback config only for the fallback test site.
-
-POST /reader-bundles:
-- Read request body.
-- Append each payload line to logs/received_payloads.jsonl.
-- Print first payload as pretty JSON.
-- Print compact receive line:
-  [INFO] Received #N | site_id=... | reader_id=... | reads=... | size=... bytes
-- Return:
-  {"status":"accepted"}
-
-8. Config files
-
-Create or restore these files:
-
-configs/pass_config.json
-configs/fail_config.json
-configs/wrong_site_config.json
-
-pass_config.json:
+Config file structure:
 
 {
   "recording_file": "data/recording_001.sqlite",
@@ -256,108 +291,44 @@ pass_config.json:
   "mock_site_file": ""
 }
 
-fail_config.json:
+For validate/play:
+- require recording_file, target_url, site_id
 
-{
-  "recording_file": "data/recording_001.sqlite",
-  "target_url": "http://localhost:8080",
-  "site_id": "b3489888-aacf-4451-893c-d7d994240f93",
-  "mock_mode": "file",
-  "mock_site_file": "configs/wrong_site_config.json"
-}
+For summary:
+- require only recording_file
 
-wrong_site_config.json must be valid JSON and must match SiteConfig structure.
-Do not use string values for readers/floors/regions/antennas.
-Use arrays of objects.
+For mock-server:
+- if mock_mode is sqlite, require recording_file and site_id
+- if mock_mode is file, require mock_site_file
 
-Use this:
+Task 5: Fix SiteJSON usage
 
-{
-  "id": "WRONG-SITE-ID",
-  "name": "Wrong Site",
-  "readers": [
-    {
-      "id": "WRONG-READER-01",
-      "name": "Wrong Reader",
-      "type": "RFID",
-      "ipAddress": "192.168.1.200",
-      "floorId": "WRONG-FLOOR-01",
-      "x": 1,
-      "y": 1,
-      "antennas": [
-        {
-          "antenna_id": 99,
-          "antenna_type": 2,
-          "reader_id": "WRONG-READER-01",
-          "x": 1,
-          "y": 1
-        }
-      ]
-    }
-  ],
-  "floors": [
-    {
-      "id": "WRONG-FLOOR-01",
-      "name": "Wrong Floor",
-      "number": 1,
-      "width": 100,
-      "height": 100,
-      "regions": [
-        {
-          "id": "WRONG-REGION-01",
-          "name": "Wrong Region",
-          "type": "WRONG_TYPE",
-          "physicality": "VIRTUAL",
-          "inventoryType": "OTHER"
-        }
-      ]
-    }
-  ],
-  "regions": [
-    {
-      "id": "WRONG-REGION-01",
-      "name": "Wrong Region",
-      "type": "WRONG_TYPE",
-      "physicality": "VIRTUAL",
-      "inventoryType": "OTHER"
-    }
-  ],
-  "antennas": [
-    {
-      "antenna_id": 99,
-      "antenna_type": 2,
-      "reader_id": "WRONG-READER-01",
-      "x": 1,
-      "y": 1
-    }
-  ]
-}
+Do not use RawSiteJSON anywhere.
 
-9. Validator must check IDs, not only counts
+For validate and play:
+- load recorded site info using GetSiteInfo
+- unmarshal siteInfo.SiteJSON into site.SiteConfig
+- error message should say SiteJSON, not RawSiteJSON
+
+Example:
+json.Unmarshal(siteInfo.SiteJSON, &recordedConfig)
+
+Task 6: Fix validator
 
 Update internal/site/validator.go.
 
-Validation must fail if IDs do not match, even if counts match.
+Validation must check actual IDs, not only counts.
 
-Check:
+Validate:
 - site ID equality
-- reader IDs equality
-- antenna IDs equality
-- floor IDs equality
-- region IDs equality
+- reader ID equality
+- antenna ID equality
+- floor ID equality
+- region ID equality
 
-Rules:
-- If recorded site ID != target site ID, fail.
-- Every recorded reader ID must exist in target.
-- Every target reader ID must exist in recorded.
-- Every recorded antenna ID must exist in target.
-- Every target antenna ID must exist in recorded.
-- Every recorded floor ID must exist in target.
-- Every target floor ID must exist in recorded.
-- Every recorded region ID must exist in target.
-- Every target region ID must exist in recorded.
+If IDs differ, validation must fail even when counts are same.
 
-Error examples:
+Error messages should be clear:
 - Site ID mismatch: recorded=..., target=...
 - Reader ID missing in target: ...
 - Reader ID missing in recorded: ...
@@ -368,138 +339,118 @@ Error examples:
 - Region ID missing in target: ...
 - Region ID missing in recorded: ...
 
-If a config has zero readers/antennas but recorded config also has zero, that section can pass. But if IDs differ, it must fail.
+Task 7: Fix mock server config mode
 
-10. SiteConfig model
+mock-server should support:
 
-Do not break real site_json unmarshalling.
+./rre.exe mock-server -config configs/pass_config.json
+./rre.exe mock-server -config configs/fail_config.json
 
-Ensure internal/site/model.go supports:
+pass_config.json:
+- mock_mode sqlite
+- load site config from Recording DB SiteInformation.site_json
+- serve exact recorded site config
 
-type SiteConfig struct {
-    SiteID   string    `json:"id"`
-    SiteName string    `json:"name"`
-    Readers  []Reader  `json:"readers,omitempty"`
-    Floors   []Floor   `json:"floors,omitempty"`
-    Regions  []Region  `json:"regions,omitempty"`
-    Antennas []Antenna `json:"antennas,omitempty"`
-}
+fail_config.json:
+- mock_mode file
+- load mock_site_file
+- serve wrong config
 
-Reader:
-- id
-- name
-- type
-- ipAddress
-- floorId
-- x
-- y
-- antennas
+wrong_site_config.json must be valid JSON and must match SiteConfig structure.
+Do not put strings inside readers array.
+readers, floors, regions, antennas must be arrays of objects.
 
-Antenna:
-- antenna_id
-- antenna_type
-- reader_id
-- x
-- y
+Task 8: Fix replay payload
 
-Floor:
-- id
-- name
-- number
-- width
-- height
-- regions
+RawPayload is []byte/BLOB.
+Do not compare RawPayload with "".
 
-Region:
-- id
-- name
-- type
-- physicality
-- inventoryType
+Use:
+if len(rawRead.RawPayload) == 0
 
-Go should ignore extra JSON fields from real Recorder site_json.
+Unmarshal:
+json.Unmarshal(rawRead.RawPayload, &payloadData)
 
-11. .gitignore
+ReadID is string.
+Use %s for ReadID errors, not %d.
 
-Do not commit generated runtime files.
+Task 9: .gitignore safety
 
-Update .gitignore if needed:
+Update .gitignore to avoid committing generated/runtime files:
 
 rre.exe
 logs/*.jsonl
 *.sqlite-shm
 *.sqlite-wal
-*.bin
 *.tmp
 *.backup
+*.bin
 
-Do not delete the logs folder itself if needed; keep .gitkeep if required.
+Do not ignore required config JSON files.
+Do not ignore configs/pass_config.json.
+Do not ignore configs/fail_config.json.
+Do not ignore configs/wrong_site_config.json.
 
-12. README and help text
+Do not commit:
+- logs/replay_output.jsonl
+- logs/received_payloads.jsonl
+- sqlite -shm files
+- sqlite -wal files
+- rre.exe
 
-Update README and internal CLI help.
+Task 10: README and help
 
-Include direct usage:
+Update README and CLI help with working commands:
 
+Build:
+go build -o rre.exe ./cmd/rre
+
+Summary:
 ./rre.exe summary -file data/recording_001.sqlite
-./rre.exe mock-server -port 8080
-./rre.exe validate -file data/recording_001.sqlite -target-url http://localhost:8080 -site-id b3489888-aacf-4451-893c-d7d994240f93
-./rre.exe play -file data/recording_001.sqlite -target-url http://localhost:8080 -site-id b3489888-aacf-4451-893c-d7d994240f93
-
-Include config usage:
-
 ./rre.exe summary -config configs/pass_config.json
+
+Start mock server pass mode:
 ./rre.exe mock-server -config configs/pass_config.json
+
+Validate pass:
 ./rre.exe validate -config configs/pass_config.json
+
+Play:
 ./rre.exe play -config configs/pass_config.json
 
-Fail validation demo:
-
-Terminal 1:
+Start mock server fail mode:
 ./rre.exe mock-server -config configs/fail_config.json
 
-Terminal 2:
+Validate fail:
 ./rre.exe validate -config configs/fail_config.json
 
-Expected:
-Validation fails with mismatch errors.
+Task 11: Tests
 
-Pass validation demo:
+Update tests so they match the real schema.
 
-Terminal 1:
-./rre.exe mock-server -config configs/pass_config.json
+Tests must not expect old camelCase columns.
 
-Terminal 2:
-./rre.exe validate -config configs/pass_config.json
+Add/adjust tests for:
+- GetSession uses description column
+- GetFirstSession uses description column
+- GetRawReads uses real RawReads columns
+- GetSiteInfo uses site_json
+- Summary works with real schema
+- Summary works with config
+- Validate pass config
+- Validate fail config
+- Validator fails when counts match but IDs differ
+- Wrong site config JSON unmarshals successfully
 
-Expected:
-Validation passes.
+Task 12: Final verification
 
-13. Tests
+Run:
 
-Update or add tests for:
-- summary direct file
-- summary config file
-- validate pass config
-- validate fail config
-- mock-server sqlite config mode
-- mock-server file config mode
-- validator fails when counts match but IDs differ
-- wrong_site_config.json unmarshals into SiteConfig
+gofmt -w ./internal/cli ./internal/config ./internal/mocktarget ./internal/recording ./internal/replay ./internal/site ./internal/sqlite
+go test ./...
+go build -o rre.exe ./cmd/rre
 
-14. Build/test
-
-After changes:
-- gofmt all changed Go files
-- go test ./...
-- go build -o rre.exe ./cmd/rre
-
-Manual check commands:
-
-./rre.exe summary -help
-./rre.exe validate -help
-./rre.exe play -help
-./rre.exe mock-server -help
+Then manually test:
 
 ./rre.exe summary -config configs/pass_config.json
 
@@ -509,7 +460,10 @@ Terminal 1:
 Terminal 2:
 ./rre.exe validate -config configs/pass_config.json
 
-Then stop server.
+Terminal 2:
+./rre.exe play -config configs/pass_config.json
+
+Stop server.
 
 Terminal 1:
 ./rre.exe mock-server -config configs/fail_config.json
@@ -517,17 +471,8 @@ Terminal 1:
 Terminal 2:
 ./rre.exe validate -config configs/fail_config.json
 
-Then stop server.
-
-Terminal 1:
-./rre.exe mock-server -config configs/pass_config.json
-
-Terminal 2:
-./rre.exe play -config configs/pass_config.json
-
-Important:
-Do not revert real Recorder SQLite repository/model/schema support.
-Do not bring back old camelCase SQL columns.
-Do not use RawSiteJSON.
-Do not create temp duplicate files.
-Do not commit logs or generated files.
+Expected:
+- pass config validation passes
+- fail config validation fails with clear mismatch errors
+- no Cycode SAST issue
+- no generated logs/exe/sqlite runtime files staged
