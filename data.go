@@ -1,77 +1,29 @@
-I need to add versioning support to the Resonate Replay Engine CLI (`rre`) in this Go project.
+README was not updated. Please update `resonate-replay-engine/README.md` for the new versioning feature.
 
-Context:
-- This is inside a monorepo: `ALTRFIDTools/resonate-replay-engine`
-- Binary name is `rre`
-- Current CLI has commands like:
-  - help
-  - generate-sample
-  - summary
-  - mock-server
-  - validate
-  - play
-- I need to add version support based on the project versioning guide.
-- Version should be injected at build time using Go ldflags.
-- Local/default version should be `dev`.
+Add a clear section for CLI versioning.
 
-Required behavior:
-1. Add support for:
-   - `rre version`
-   - `rre --version`
-   - `rre -v`
+Required README updates:
+1. Add version command usage:
+   - `.\rre.exe version`
+   - `.\rre.exe --version`
+   - `.\rre.exe -v`
 
-2. Output should be:
-   `rre version <version>`
-
-   Example:
-   `rre version v0.1.0`
-
-3. Default local build output should be:
+2. Add expected output:
    `rre version dev`
+   for normal local build.
 
-4. Build command with injected version should work:
+3. Add build command with injected version:
    `go build -ldflags="-X main.version=v0.1.0" -o rre.exe ./cmd/rre`
 
-5. Do not break existing commands:
-   - `rre help`
-   - `rre summary`
-   - `rre validate`
-   - `rre play`
-   - `rre mock-server`
-   - config based commands must still work
+4. Add expected output after version-injected build:
+   `rre version v0.1.0`
 
-Implementation preference:
-- Add `var version = "dev"` in `cmd/rre/main.go` package main.
-- In `main.go`, handle root-level version flags before normal CLI command parsing:
-  - if first arg is `version`, `--version`, or `-v`, print version and exit.
-- Also add `version` as a normal command in CLI help if the existing dispatcher requires it.
-- Update `internal/cli/args.go` help text to include:
-  - `version          Show Replay Engine version`
-  - examples for `rre version`, `rre --version`, and `rre -v`
-  - build example using ldflags.
+5. Add a short note:
+   - `dev` is the default version for local builds.
+   - Release builds should inject the release tag using `-ldflags`.
+   - Git tags should follow the monorepo tool format: `resonate-replay-engine/vMAJOR.MINOR.PATCH`
 
-Important:
-- Do not modify unrelated modules like `resonate-recorder` or `resonate-analyzer`.
-- Do not add generated files to Git:
-  - `rre.exe`
-  - `logs/*.jsonl`
-  - `data/*.sqlite-shm`
-  - `data/*.sqlite-wal`
-  - `data/*.bin`
-- Do not reintroduce Cycode violations.
-- Do not use user-controlled paths directly in `os.ReadFile` or HTTP request calls.
-- Keep changes small and focused only on versioning.
+6. Do not change unrelated docs.
+7. Do not add generated files like `rre.exe`, logs, sqlite wal/shm, or bin files.
 
-After implementation, run or make sure these commands pass:
-- `gofmt -w cmd/rre/main.go internal/cli/args.go`
-- `go test ./...`
-- `go build -ldflags="-X main.version=v0.1.0" -o rre.exe ./cmd/rre`
-- `.\rre.exe version`
-- `.\rre.exe --version`
-- `.\rre.exe -v`
-- `.\rre.exe help`
-
-Expected version command result:
-`rre version v0.1.0`
-
-Please implement this cleanly and show me the changed files.
+After update, show the README changes only.
