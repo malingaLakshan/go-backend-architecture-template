@@ -1,7 +1,16 @@
-Reviewed the latest Replay Engine folder restructure and synced the branch with the updated repository structure. Started moving the real Recorder SQLite integration work into the new resonate-replay-engine ............
-Updated Replay Engine to support the real Recorder SQLite database schema, including SiteInformation.site_json, RawReads snake_case columns, and real recording summary validation.......
-Implemented and tested config-based QA flow for mock-server, validate, and play commands. Added pass/fail config support so QA can test matching and mismatching site configurations............
-Fixed merge/review issues after the repository restructure, cleaned temporary/generated files, updated validation and logging outputs, and verified replay using the real Recorder SQLite file.
+Please add config-file support to the summary command without breaking the existing -file behavior.
 
+Current behavior:
+rre summary -file data/recording_001.sqlite
 
+New behavior needed:
+rre summary -config configs/pass_config.json
 
+Rules:
+1. If -config is provided, load RunConfig and use recording_file as the summary input file.
+2. If -file is provided, keep existing behavior.
+3. If both -config and -file are provided, let -config take priority or return a clear error. Prefer clear error.
+4. Summary does not need target_url, site_id, mock_mode, or mock_site_file.
+5. Do not change validate/play/mock-server behavior.
+6. Add/update help text to show both summary examples.
+7. Run gofmt, go test ./..., and go build -o rre.exe ./cmd/rre.
