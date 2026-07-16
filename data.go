@@ -1,776 +1,881 @@
 package site
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 )
 
 // -----------------------------------------------------------------------------
-// ParseSiteGraph - happy path
+// ValidateStructure - complete match
 // -----------------------------------------------------------------------------
 
-func TestParseSiteGraph_FullHierarchy(t *testing.T) {
-	raw := `{
-		"id": "SITE-PARSE",
-		"name": "Ignored Site Name",
-		"floors": [
-			{
-				"id": "F1",
-				"name": "Ground Floor",
-				"regions": [
-					{
-						"id": "R1",
-						"name": "Entrance",
-						"regions": [
-							{
-								"id": "R1-CHILD",
-								"name": "Entrance Child",
-								"regions": [
-									{
-										"id": "R1-GRANDCHILD",
-										"name": "Entrance Grandchild"
-									}
-								]
-							}
-						]
-					},
-					{
-						"id": "R2",
-						"name": "Checkout"
-					}
-				],
-				"readers": [
-					{
-						"id": "RDR1",
-						"make": "Impinj",
-						"antennas": [
-							{"port": 1, "gain": 6.0},
-							{"port": 2, "gain": 6.0},
-							{"port": 3},
-							{"port": 4}
-						]
-					},
-					{
-						"id": "RDR2",
-						"antennas": [
-							{"port": 5},
-							{"port": 6},
-							{"port": 7},
-							{"port": 8}
-						]
-					}
-				]
+func TestValidateStructure_CompleteMatch(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion(
+					"R1",
+					validationRegion(
+						"R1-CHILD",
+						validationRegion("R1-GRANDCHILD"),
+					),
+				),
+				validationRegion("R2"),
 			},
-			{
-				"id": "F2",
-				"regions": [
-					{
-						"id": "R3",
-						"regions": [
-							{
-								"id": "R3-CHILD"
-							}
-						]
-					}
-				],
-				"readers": [
-					{
-						"id": "RDR3",
-						"antennas": [
-							{"port": 1}
-						]
-					}
-				]
-			}
-		]
-	}`
+			validationReader("READER-1", 1, 2, 3, 4),
+			validationReader("READER-2", 5, 6, 7, 8),
+		),
+	)
 
-	vs, err := ParseSiteGraph([]byte(raw))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	target := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion(
+					"R1",
+					validationRegion(
+						"R1-CHILD",
+						validationRegion("R1-GRANDCHILD"),
+					),
+				),
+				validationRegion("R2"),
+			},
+			validationReader("READER-1", 1, 2, 3, 4),
+			validationReader("READER-2", 5, 6, 7, 8),
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if !result.Passed {
+		t.Fatalf("expected validation to pass, errors: %v", result.Errors)
 	}
 
-	if vs.SiteID != "SITE-PARSE" {
-		t.Errorf("SiteID: want SITE-PARSE, got %s", vs.SiteID)
+	if len(result.Mismatches) != 0 {
+		t.Errorf("expected no mismatches, got %v", result.Mismatches)
 	}
 
-	if len(vs.Floors) != 2 {
-		t.Fatalf("Floors: want 2, got %d", len(vs.Floors))
-	}
+	assertCategory(
+		t,
+		"SiteID",
+		result.SiteID,
+		1,
+		1,
+		true,
+	)
 
-	// First floor.
-	f1 := vs.Floors[0]
+	assertCategory(
+		t,
+		"Floors",
+		result.Floors,
+		1,
+		1,
+		true,
+	)
 
-	if f1.ID != "F1" {
-		t.Errorf("Floor[0].ID: want F1, got %s", f1.ID)
-	}
+	// R1, R1-CHILD, R1-GRANDCHILD and R2.
+	assertCategory(
+		t,
+		"Regions",
+		result.Regions,
+		4,
+		4,
+		true,
+	)
 
-	if len(f1.Regions) != 2 {
-		t.Fatalf("Floor[0].Regions: want 2, got %d", len(f1.Regions))
-	}
+	assertCategory(
+		t,
+		"Readers",
+		result.Readers,
+		2,
+		2,
+		true,
+	)
 
-	if len(f1.Readers) != 2 {
-		t.Fatalf("Floor[0].Readers: want 2, got %d", len(f1.Readers))
-	}
+	assertCategory(
+		t,
+		"AntennaPorts",
+		result.AntennaPorts,
+		8,
+		8,
+		true,
+	)
+}
 
-	// Recursive Region hierarchy:
-	// R1 -> R1-CHILD -> R1-GRANDCHILD.
-	r1 := f1.Regions[0]
+// -----------------------------------------------------------------------------
+// Target can contain additional structures
+// -----------------------------------------------------------------------------
 
-	if r1.ID != "R1" {
-		t.Errorf("Floor[0].Region[0].ID: want R1, got %s", r1.ID)
-	}
+func TestValidateStructure_TargetExtrasAllowed(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion(
+					"R1",
+					validationRegion("R1-CHILD"),
+				),
+			},
+			validationReader("READER-1", 1, 2),
+		),
+	)
 
-	if len(r1.Regions) != 1 {
+	target := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion(
+					"R1",
+					validationRegion("R1-CHILD"),
+					validationRegion("EXTRA-CHILD"),
+				),
+				validationRegion("EXTRA-REGION"),
+			},
+			validationReader("READER-1", 1, 2, 3, 4),
+			validationReader("EXTRA-READER", 1, 2),
+		),
+		validationFloor(
+			"EXTRA-FLOOR",
+			[]ValidationRegion{
+				validationRegion("EXTRA-FLOOR-REGION"),
+			},
+			validationReader("EXTRA-FLOOR-READER", 1),
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if !result.Passed {
 		t.Fatalf(
-			"Floor[0].Region[0].Regions: want 1, got %d",
-			len(r1.Regions),
+			"expected validation to pass when target has extra structures, errors: %v",
+			result.Errors,
 		)
 	}
 
-	r1Child := r1.Regions[0]
+	assertCategory(t, "Floors", result.Floors, 1, 1, true)
+	assertCategory(t, "Regions", result.Regions, 2, 2, true)
+	assertCategory(t, "Readers", result.Readers, 1, 1, true)
+	assertCategory(t, "AntennaPorts", result.AntennaPorts, 2, 2, true)
+}
 
-	if r1Child.ID != "R1-CHILD" {
-		t.Errorf(
-			"nested Region ID: want R1-CHILD, got %s",
-			r1Child.ID,
-		)
+// -----------------------------------------------------------------------------
+// Site ID mismatch
+// -----------------------------------------------------------------------------
+
+func TestValidateStructure_SiteIDMismatch(t *testing.T) {
+	recorded := validationSite(
+		"RECORDED-SITE",
+		validationFloor(
+			"F1",
+			nil,
+			validationReader("READER-1", 1),
+		),
+	)
+
+	target := validationSite(
+		"TARGET-SITE",
+		validationFloor(
+			"F1",
+			nil,
+			validationReader("READER-1", 1),
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if result.Passed {
+		t.Fatal("expected Site ID mismatch to fail validation")
 	}
 
-	if len(r1Child.Regions) != 1 {
+	assertCategory(t, "SiteID", result.SiteID, 1, 0, false)
+
+	if len(result.Mismatches) != 1 {
 		t.Fatalf(
-			"R1-CHILD.Regions: want 1, got %d",
-			len(r1Child.Regions),
+			"expected 1 mismatch, got %d: %v",
+			len(result.Mismatches),
+			result.Mismatches,
 		)
 	}
 
-	if r1Child.Regions[0].ID != "R1-GRANDCHILD" {
+	mismatch := result.Mismatches[0]
+
+	if mismatch.Type != "SiteID" {
+		t.Errorf("mismatch Type: want SiteID, got %s", mismatch.Type)
+	}
+
+	if mismatch.SiteID != "RECORDED-SITE" {
 		t.Errorf(
-			"grandchild Region ID: want R1-GRANDCHILD, got %s",
-			r1Child.Regions[0].ID,
+			"mismatch SiteID: want RECORDED-SITE, got %s",
+			mismatch.SiteID,
 		)
 	}
 
-	if f1.Regions[1].ID != "R2" {
-		t.Errorf(
-			"Floor[0].Region[1].ID: want R2, got %s",
-			f1.Regions[1].ID,
-		)
+	assertErrorContains(
+		t,
+		result,
+		"recorded site ID RECORDED-SITE does not match target site ID TARGET-SITE",
+	)
+}
+
+// -----------------------------------------------------------------------------
+// Missing Floor
+// -----------------------------------------------------------------------------
+
+func TestValidateStructure_MissingFloor(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion("R1"),
+			},
+			validationReader("READER-1", 1, 2),
+		),
+		validationFloor(
+			"F2",
+			[]ValidationRegion{
+				validationRegion("R2"),
+			},
+			validationReader("READER-2", 1),
+		),
+	)
+
+	target := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion("R1"),
+			},
+			validationReader("READER-1", 1, 2),
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if result.Passed {
+		t.Fatal("expected missing Floor to fail validation")
 	}
 
-	// Readers are directly under the Floor, not under Regions.
-	rdr1 := f1.Readers[0]
+	assertCategory(t, "Floors", result.Floors, 2, 1, false)
 
-	if rdr1.ID != "RDR1" {
-		t.Errorf("Floor[0].Reader[0].ID: want RDR1, got %s", rdr1.ID)
+	mismatch := findMismatch(
+		t,
+		result,
+		func(m ValidationMismatch) bool {
+			return m.Type == "Floor" && m.FloorID == "F2"
+		},
+	)
+
+	if mismatch.Message == "" {
+		t.Error("expected missing Floor mismatch to contain a message")
 	}
 
-	wantPorts1 := []int{1, 2, 3, 4}
+	assertErrorContains(
+		t,
+		result,
+		"target site is missing Floor ID F2",
+	)
+}
 
-	if len(rdr1.AntennaPorts) != len(wantPorts1) {
+// -----------------------------------------------------------------------------
+// Recursive Region validation
+// -----------------------------------------------------------------------------
+
+func TestValidateStructure_RecursiveRegionsMatch(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion(
+					"R1",
+					validationRegion(
+						"R2",
+						validationRegion("R3"),
+						validationRegion("R4"),
+					),
+				),
+			},
+		),
+	)
+
+	target := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion(
+					"R1",
+					validationRegion(
+						"R2",
+						validationRegion("R3"),
+						validationRegion("R4"),
+					),
+				),
+			},
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if !result.Passed {
 		t.Fatalf(
-			"Reader[0].AntennaPorts: want %v, got %v",
-			wantPorts1,
-			rdr1.AntennaPorts,
+			"expected recursive Region hierarchy to pass, errors: %v",
+			result.Errors,
 		)
 	}
 
-	for i, wantPort := range wantPorts1 {
-		if rdr1.AntennaPorts[i] != wantPort {
+	// R1, R2, R3 and R4.
+	assertCategory(t, "Regions", result.Regions, 4, 4, true)
+}
+
+func TestValidateStructure_MissingTopLevelRegion(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion("RECORDED-REGION"),
+			},
+		),
+	)
+
+	target := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion("OTHER-REGION"),
+			},
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if result.Passed {
+		t.Fatal("expected missing top-level Region to fail validation")
+	}
+
+	assertCategory(t, "Regions", result.Regions, 1, 0, false)
+
+	mismatch := findMismatch(
+		t,
+		result,
+		func(m ValidationMismatch) bool {
+			return m.Type == "Region" &&
+				m.FloorID == "F1" &&
+				m.ParentRegionID == "" &&
+				m.RegionID == "RECORDED-REGION"
+		},
+	)
+
+	if mismatch.Message == "" {
+		t.Error("expected Region mismatch message")
+	}
+
+	assertErrorContains(
+		t,
+		result,
+		"target site is missing Region ID RECORDED-REGION under Floor ID F1",
+	)
+}
+
+func TestValidateStructure_RegionUnderWrongParentFails(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion(
+					"PARENT-A",
+					validationRegion("CHILD-X"),
+				),
+				validationRegion("PARENT-B"),
+			},
+		),
+	)
+
+	// CHILD-X exists in the target, but it is under PARENT-B instead of PARENT-A.
+	target := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion("PARENT-A"),
+				validationRegion(
+					"PARENT-B",
+					validationRegion("CHILD-X"),
+				),
+			},
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if result.Passed {
+		t.Fatal(
+			"expected Region under the wrong parent to fail validation",
+		)
+	}
+
+	assertCategory(t, "Regions", result.Regions, 3, 2, false)
+
+	mismatch := findMismatch(
+		t,
+		result,
+		func(m ValidationMismatch) bool {
+			return m.Type == "Region" &&
+				m.FloorID == "F1" &&
+				m.ParentRegionID == "PARENT-A" &&
+				m.RegionID == "CHILD-X"
+		},
+	)
+
+	if mismatch.Message == "" {
+		t.Error("expected wrong-parent Region mismatch message")
+	}
+
+	assertErrorContains(
+		t,
+		result,
+		"target site is missing Region ID CHILD-X under parent Region ID PARENT-A",
+	)
+}
+
+func TestValidateStructure_RegionUnderWrongFloorFails(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion("REGION-X"),
+			},
+		),
+		validationFloor("F2", nil),
+	)
+
+	// REGION-X exists, but only under F2.
+	target := validationSite(
+		"SITE-1",
+		validationFloor("F1", nil),
+		validationFloor(
+			"F2",
+			[]ValidationRegion{
+				validationRegion("REGION-X"),
+			},
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if result.Passed {
+		t.Fatal(
+			"expected Region under the wrong Floor to fail validation",
+		)
+	}
+
+	findMismatch(
+		t,
+		result,
+		func(m ValidationMismatch) bool {
+			return m.Type == "Region" &&
+				m.FloorID == "F1" &&
+				m.ParentRegionID == "" &&
+				m.RegionID == "REGION-X"
+		},
+	)
+}
+
+// -----------------------------------------------------------------------------
+// Reader validation
+// -----------------------------------------------------------------------------
+
+func TestValidateStructure_MissingReaderUnderFloor(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion("R1"),
+			},
+			validationReader("READER-1", 1, 2),
+			validationReader("READER-2", 1),
+		),
+	)
+
+	target := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion("R1"),
+			},
+			validationReader("READER-1", 1, 2),
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if result.Passed {
+		t.Fatal("expected missing Reader to fail validation")
+	}
+
+	assertCategory(t, "Readers", result.Readers, 2, 1, false)
+
+	mismatch := findMismatch(
+		t,
+		result,
+		func(m ValidationMismatch) bool {
+			return m.Type == "Reader" &&
+				m.FloorID == "F1" &&
+				m.ReaderID == "READER-2"
+		},
+	)
+
+	if mismatch.Message == "" {
+		t.Error("expected missing Reader mismatch message")
+	}
+
+	assertErrorContains(
+		t,
+		result,
+		"target site is missing Reader ID READER-2 under Floor ID F1",
+	)
+}
+
+func TestValidateStructure_ReaderUnderWrongFloorFails(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			nil,
+			validationReader("READER-X", 1),
+		),
+		validationFloor("F2", nil),
+	)
+
+	// READER-X exists in the target but is under F2, not F1.
+	target := validationSite(
+		"SITE-1",
+		validationFloor("F1", nil),
+		validationFloor(
+			"F2",
+			nil,
+			validationReader("READER-X", 1),
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if result.Passed {
+		t.Fatal(
+			"expected Reader under the wrong Floor to fail validation",
+		)
+	}
+
+	findMismatch(
+		t,
+		result,
+		func(m ValidationMismatch) bool {
+			return m.Type == "Reader" &&
+				m.FloorID == "F1" &&
+				m.ReaderID == "READER-X"
+		},
+	)
+}
+
+// -----------------------------------------------------------------------------
+// Antenna-port validation
+// -----------------------------------------------------------------------------
+
+func TestValidateStructure_MissingAntennaPort(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			nil,
+			validationReader("READER-1", 1, 2, 3, 4),
+		),
+	)
+
+	target := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			nil,
+			validationReader("READER-1", 1, 2, 4),
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if result.Passed {
+		t.Fatal("expected missing antenna port to fail validation")
+	}
+
+	assertCategory(t, "Readers", result.Readers, 1, 1, true)
+	assertCategory(t, "AntennaPorts", result.AntennaPorts, 4, 3, false)
+
+	mismatch := findMismatch(
+		t,
+		result,
+		func(m ValidationMismatch) bool {
+			return m.Type == "AntennaPort" &&
+				m.FloorID == "F1" &&
+				m.ReaderID == "READER-1" &&
+				m.AntennaPort == 3
+		},
+	)
+
+	if mismatch.Message == "" {
+		t.Error("expected missing antenna-port mismatch message")
+	}
+
+	assertErrorContains(
+		t,
+		result,
+		"target site is missing antenna port 3 under Reader ID READER-1",
+	)
+}
+
+func TestValidateStructure_AntennaPortUnderWrongReaderFails(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			nil,
+			validationReader("READER-1", 1, 2),
+			validationReader("READER-2", 3),
+		),
+	)
+
+	// Port 2 exists in the target, but under READER-2 rather than READER-1.
+	target := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			nil,
+			validationReader("READER-1", 1),
+			validationReader("READER-2", 2, 3),
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if result.Passed {
+		t.Fatal(
+			"expected antenna port under the wrong Reader to fail validation",
+		)
+	}
+
+	findMismatch(
+		t,
+		result,
+		func(m ValidationMismatch) bool {
+			return m.Type == "AntennaPort" &&
+				m.FloorID == "F1" &&
+				m.ReaderID == "READER-1" &&
+				m.AntennaPort == 2
+		},
+	)
+}
+
+// -----------------------------------------------------------------------------
+// Multiple mismatches and backward-compatible Errors
+// -----------------------------------------------------------------------------
+
+func TestValidateStructure_MultipleMismatches(t *testing.T) {
+	recorded := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion(
+					"R1",
+					validationRegion("R1-CHILD"),
+				),
+			},
+			validationReader("READER-1", 1, 2),
+			validationReader("READER-2", 1),
+		),
+	)
+
+	target := validationSite(
+		"SITE-1",
+		validationFloor(
+			"F1",
+			[]ValidationRegion{
+				validationRegion("R1"),
+			},
+			validationReader("READER-1", 1),
+		),
+	)
+
+	result := ValidateStructure(recorded, target)
+
+	if result.Passed {
+		t.Fatal("expected validation with multiple mismatches to fail")
+	}
+
+	// Missing:
+	// - R1-CHILD
+	// - READER-1 antenna port 2
+	// - READER-2
+	if len(result.Mismatches) != 3 {
+		t.Fatalf(
+			"expected 3 mismatches, got %d: %v",
+			len(result.Mismatches),
+			result.Mismatches,
+		)
+	}
+
+	if len(result.Errors) != len(result.Mismatches) {
+		t.Fatalf(
+			"Errors and Mismatches lengths differ: Errors=%d Mismatches=%d",
+			len(result.Errors),
+			len(result.Mismatches),
+		)
+	}
+
+	for i, mismatch := range result.Mismatches {
+		if result.Errors[i] != mismatch.Message {
 			t.Errorf(
-				"Reader[0].AntennaPorts[%d]: want %d, got %d",
+				"Errors[%d] does not mirror mismatch message: want %q, got %q",
 				i,
-				wantPort,
-				rdr1.AntennaPorts[i],
+				mismatch.Message,
+				result.Errors[i],
 			)
 		}
 	}
-
-	rdr2 := f1.Readers[1]
-
-	if rdr2.ID != "RDR2" {
-		t.Errorf("Floor[0].Reader[1].ID: want RDR2, got %s", rdr2.ID)
-	}
-
-	wantPorts2 := []int{5, 6, 7, 8}
-
-	if len(rdr2.AntennaPorts) != len(wantPorts2) {
-		t.Fatalf(
-			"Reader[1].AntennaPorts: want %v, got %v",
-			wantPorts2,
-			rdr2.AntennaPorts,
-		)
-	}
-
-	for i, wantPort := range wantPorts2 {
-		if rdr2.AntennaPorts[i] != wantPort {
-			t.Errorf(
-				"Reader[1].AntennaPorts[%d]: want %d, got %d",
-				i,
-				wantPort,
-				rdr2.AntennaPorts[i],
-			)
-		}
-	}
-
-	// Second floor.
-	f2 := vs.Floors[1]
-
-	if f2.ID != "F2" {
-		t.Errorf("Floor[1].ID: want F2, got %s", f2.ID)
-	}
-
-	if len(f2.Regions) != 1 {
-		t.Fatalf("Floor[1].Regions: want 1, got %d", len(f2.Regions))
-	}
-
-	if f2.Regions[0].ID != "R3" {
-		t.Errorf(
-			"Floor[1].Region[0].ID: want R3, got %s",
-			f2.Regions[0].ID,
-		)
-	}
-
-	if len(f2.Regions[0].Regions) != 1 {
-		t.Fatalf(
-			"Floor[1].Region[0].Regions: want 1, got %d",
-			len(f2.Regions[0].Regions),
-		)
-	}
-
-	if f2.Regions[0].Regions[0].ID != "R3-CHILD" {
-		t.Errorf(
-			"nested Region ID: want R3-CHILD, got %s",
-			f2.Regions[0].Regions[0].ID,
-		)
-	}
-
-	if len(f2.Readers) != 1 {
-		t.Fatalf("Floor[1].Readers: want 1, got %d", len(f2.Readers))
-	}
-
-	if f2.Readers[0].ID != "RDR3" {
-		t.Errorf(
-			"Floor[1].Reader[0].ID: want RDR3, got %s",
-			f2.Readers[0].ID,
-		)
-	}
-
-	if len(f2.Readers[0].AntennaPorts) != 1 ||
-		f2.Readers[0].AntennaPorts[0] != 1 {
-		t.Errorf(
-			"Floor[1].Reader[0].AntennaPorts: want [1], got %v",
-			f2.Readers[0].AntennaPorts,
-		)
-	}
 }
 
 // -----------------------------------------------------------------------------
-// ParseSiteGraph - unknown fields are ignored
+// Test helpers
 // -----------------------------------------------------------------------------
 
-func TestParseSiteGraph_UnknownFieldsIgnored(t *testing.T) {
-	raw := `{
-		"id": "SITE-X",
-		"completely_unknown": "value",
-		"networking": {
-			"ip": "1.2.3.4"
-		},
-		"floors": [
-			{
-				"id": "F1",
-				"bounds": [1, 2, 3, 4],
-				"regions": [
-					{
-						"id": "R1",
-						"inventoryType": "retail",
-						"regions": [
-							{
-								"id": "R1-CHILD",
-								"behaviors": []
-							}
-						]
-					}
-				],
-				"readers": [
-					{
-						"id": "RDR1",
-						"model": "R420",
-						"timeouts": {},
-						"physicality": "ceiling",
-						"behaviors": [],
-						"antennas": [
-							{
-								"port": 1,
-								"position": [0, 0, 0]
-							}
-						]
-					}
-				]
-			}
-		]
-	}`
-
-	vs, err := ParseSiteGraph([]byte(raw))
-	if err != nil {
-		t.Fatalf(
-			"unexpected error parsing SiteGraph with unknown fields: %v",
-			err,
-		)
-	}
-
-	if vs.SiteID != "SITE-X" {
-		t.Errorf("SiteID: want SITE-X, got %s", vs.SiteID)
-	}
-
-	if len(vs.Floors) != 1 {
-		t.Fatalf("Floors: want 1, got %d", len(vs.Floors))
-	}
-
-	floor := vs.Floors[0]
-
-	if len(floor.Regions) != 1 {
-		t.Fatalf("Regions: want 1, got %d", len(floor.Regions))
-	}
-
-	if floor.Regions[0].ID != "R1" {
-		t.Errorf("Region ID: want R1, got %s", floor.Regions[0].ID)
-	}
-
-	if len(floor.Regions[0].Regions) != 1 {
-		t.Fatalf(
-			"nested Regions: want 1, got %d",
-			len(floor.Regions[0].Regions),
-		)
-	}
-
-	if floor.Regions[0].Regions[0].ID != "R1-CHILD" {
-		t.Errorf(
-			"nested Region ID: want R1-CHILD, got %s",
-			floor.Regions[0].Regions[0].ID,
-		)
-	}
-
-	if len(floor.Readers) != 1 {
-		t.Fatalf("Readers: want 1, got %d", len(floor.Readers))
-	}
-
-	if floor.Readers[0].ID != "RDR1" {
-		t.Errorf("Reader ID: want RDR1, got %s", floor.Readers[0].ID)
-	}
-
-	if len(floor.Readers[0].AntennaPorts) != 1 ||
-		floor.Readers[0].AntennaPorts[0] != 1 {
-		t.Errorf(
-			"unexpected antenna ports: %v",
-			floor.Readers[0].AntennaPorts,
-		)
-	}
-}
-
-// -----------------------------------------------------------------------------
-// ParseSiteGraph - error cases
-// -----------------------------------------------------------------------------
-
-func TestParseSiteGraph_EmptyInput_Error(t *testing.T) {
-	_, err := ParseSiteGraph([]byte{})
-
-	if err == nil {
-		t.Fatal("expected error for empty input")
-	}
-}
-
-func TestParseSiteGraph_MissingRootID_Error(t *testing.T) {
-	raw := `{"floors":[]}`
-
-	_, err := ParseSiteGraph([]byte(raw))
-
-	if err == nil {
-		t.Fatal("expected error when root id field is missing")
-	}
-
-	if !strings.Contains(err.Error(), "root field: id") {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestParseSiteGraph_InvalidJSON_Error(t *testing.T) {
-	_, err := ParseSiteGraph([]byte(`{ bad json `))
-
-	if err == nil {
-		t.Fatal("expected error for invalid JSON")
-	}
-}
-
-func TestParseSiteGraph_MissingFloorID_Error(t *testing.T) {
-	raw := `{
-		"id": "SITE-X",
-		"floors": [
-			{
-				"regions": []
-			}
-		]
-	}`
-
-	_, err := ParseSiteGraph([]byte(raw))
-
-	if err == nil {
-		t.Fatal("expected error when Floor ID is missing")
-	}
-
-	if !strings.Contains(err.Error(), "floor[0]") {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestParseSiteGraph_MissingRegionID_Error(t *testing.T) {
-	raw := `{
-		"id": "SITE-X",
-		"floors": [
-			{
-				"id": "F1",
-				"regions": [
-					{}
-				]
-			}
-		]
-	}`
-
-	_, err := ParseSiteGraph([]byte(raw))
-
-	if err == nil {
-		t.Fatal("expected error when Region ID is missing")
-	}
-
-	if !strings.Contains(err.Error(), "region[0]") {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestParseSiteGraph_MissingNestedRegionID_Error(t *testing.T) {
-	raw := `{
-		"id": "SITE-X",
-		"floors": [
-			{
-				"id": "F1",
-				"regions": [
-					{
-						"id": "R1",
-						"regions": [
-							{}
-						]
-					}
-				]
-			}
-		]
-	}`
-
-	_, err := ParseSiteGraph([]byte(raw))
-
-	if err == nil {
-		t.Fatal("expected error when nested Region ID is missing")
-	}
-
-	if !strings.Contains(err.Error(), "region[0]") {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestParseSiteGraph_MissingReaderID_Error(t *testing.T) {
-	raw := `{
-		"id": "SITE-X",
-		"floors": [
-			{
-				"id": "F1",
-				"readers": [
-					{
-						"antennas": [
-							{"port": 1}
-						]
-					}
-				]
-			}
-		]
-	}`
-
-	_, err := ParseSiteGraph([]byte(raw))
-
-	if err == nil {
-		t.Fatal("expected error when Reader ID is missing")
-	}
-
-	if !strings.Contains(err.Error(), "reader[0]") {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-// -----------------------------------------------------------------------------
-// ToSiteGraphResponse - round trip
-// -----------------------------------------------------------------------------
-
-func TestToSiteGraphResponse_RoundTrip(t *testing.T) {
-	original := &ValidationSite{
-		SiteID: "SITE-RT",
-		Floors: []ValidationFloor{
-			{
-				ID: "F1",
-				Regions: []ValidationRegion{
-					{
-						ID: "R1",
-						Regions: []ValidationRegion{
-							{
-								ID: "R1-CHILD",
-								Regions: []ValidationRegion{
-									{
-										ID: "R1-GRANDCHILD",
-									},
-								},
-							},
-						},
-					},
-				},
-				Readers: []ValidationReader{
-					{
-						ID:           "RDR1",
-						AntennaPorts: []int{1, 2, 3, 4, 5, 6, 7, 8},
-					},
-				},
-			},
-		},
-	}
-
-	// Convert to SiteGraph-compatible JSON.
-	response := ToSiteGraphResponse(original)
-
-	data, err := json.Marshal(response)
-	if err != nil {
-		t.Fatalf("failed to marshal SiteGraphResponse: %v", err)
-	}
-
-	// Parse the converted response back into ValidationSite.
-	parsed, err := ParseSiteGraph(data)
-	if err != nil {
-		t.Fatalf(
-			"ParseSiteGraph failed on ToSiteGraphResponse output: %v",
-			err,
-		)
-	}
-
-	if parsed.SiteID != original.SiteID {
-		t.Errorf(
-			"SiteID: want %s, got %s",
-			original.SiteID,
-			parsed.SiteID,
-		)
-	}
-
-	if len(parsed.Floors) != 1 {
-		t.Fatalf("Floors: want 1, got %d", len(parsed.Floors))
-	}
-
-	floor := parsed.Floors[0]
-
-	if floor.ID != "F1" {
-		t.Errorf("Floor ID: want F1, got %s", floor.ID)
-	}
-
-	if len(floor.Regions) != 1 {
-		t.Fatalf("Regions: want 1, got %d", len(floor.Regions))
-	}
-
-	if floor.Regions[0].ID != "R1" {
-		t.Errorf("Region ID: want R1, got %s", floor.Regions[0].ID)
-	}
-
-	if len(floor.Regions[0].Regions) != 1 {
-		t.Fatalf(
-			"nested Regions: want 1, got %d",
-			len(floor.Regions[0].Regions),
-		)
-	}
-
-	child := floor.Regions[0].Regions[0]
-
-	if child.ID != "R1-CHILD" {
-		t.Errorf("child Region ID: want R1-CHILD, got %s", child.ID)
-	}
-
-	if len(child.Regions) != 1 {
-		t.Fatalf(
-			"grandchild Regions: want 1, got %d",
-			len(child.Regions),
-		)
-	}
-
-	if child.Regions[0].ID != "R1-GRANDCHILD" {
-		t.Errorf(
-			"grandchild Region ID: want R1-GRANDCHILD, got %s",
-			child.Regions[0].ID,
-		)
-	}
-
-	// Readers must remain directly under the Floor.
-	if len(floor.Readers) != 1 {
-		t.Fatalf("Readers: want 1, got %d", len(floor.Readers))
-	}
-
-	if floor.Readers[0].ID != "RDR1" {
-		t.Errorf("Reader ID: want RDR1, got %s", floor.Readers[0].ID)
-	}
-
-	ports := floor.Readers[0].AntennaPorts
-
-	if len(ports) != 8 {
-		t.Fatalf("AntennaPorts: want 8, got %d: %v", len(ports), ports)
-	}
-
-	for i, wantPort := range []int{1, 2, 3, 4, 5, 6, 7, 8} {
-		if ports[i] != wantPort {
-			t.Errorf(
-				"AntennaPorts[%d]: want %d, got %d",
-				i,
-				wantPort,
-				ports[i],
-			)
-		}
-	}
-}
-
-// -----------------------------------------------------------------------------
-// CountValidationSite
-// -----------------------------------------------------------------------------
-
-func TestCountValidationSite_MultipleFloors(t *testing.T) {
-	vs := makeValidationSiteForCountTest()
-
-	counts := CountValidationSite(vs)
-
-	if counts.Floors != 2 {
-		t.Errorf("Floors: want 2, got %d", counts.Floors)
-	}
-
-	if counts.Regions != 4 {
-		t.Errorf("Regions: want 4, got %d", counts.Regions)
-	}
-
-	if counts.Readers != 8 {
-		t.Errorf("Readers: want 8, got %d", counts.Readers)
-	}
-
-	if counts.AntennaPorts != 32 {
-		t.Errorf(
-			"AntennaPorts: want 32, got %d",
-			counts.AntennaPorts,
-		)
-	}
-}
-
-func TestCountValidationSite_RecursiveRegions(t *testing.T) {
-	vs := &ValidationSite{
-		SiteID: "SITE-RECURSIVE",
-		Floors: []ValidationFloor{
-			{
-				ID: "F1",
-				Regions: []ValidationRegion{
-					{
-						ID: "R1",
-						Regions: []ValidationRegion{
-							{
-								ID: "R2",
-								Regions: []ValidationRegion{
-									{
-										ID: "R3",
-									},
-									{
-										ID: "R4",
-									},
-								},
-							},
-						},
-					},
-					{
-						ID: "R5",
-					},
-				},
-				Readers: []ValidationReader{
-					{
-						ID:           "RDR1",
-						AntennaPorts: []int{1, 2},
-					},
-				},
-			},
-		},
-	}
-
-	counts := CountValidationSite(vs)
-
-	if counts.Floors != 1 {
-		t.Errorf("Floors: want 1, got %d", counts.Floors)
-	}
-
-	// R1, R2, R3, R4 and R5.
-	if counts.Regions != 5 {
-		t.Errorf("Regions: want 5, got %d", counts.Regions)
-	}
-
-	if counts.Readers != 1 {
-		t.Errorf("Readers: want 1, got %d", counts.Readers)
-	}
-
-	if counts.AntennaPorts != 2 {
-		t.Errorf(
-			"AntennaPorts: want 2, got %d",
-			counts.AntennaPorts,
-		)
-	}
-}
-
-func makeValidationSiteForCountTest() *ValidationSite {
-	makeReader := func(id string) ValidationReader {
-		return ValidationReader{
-			ID:           id,
-			AntennaPorts: []int{1, 2, 3, 4},
-		}
-	}
-
+func validationSite(
+	siteID string,
+	floors ...ValidationFloor,
+) *ValidationSite {
 	return &ValidationSite{
-		SiteID: "SITE-COUNT",
-		Floors: []ValidationFloor{
-			{
-				ID: "F1",
-				Regions: []ValidationRegion{
-					{
-						ID: "F1-R1",
-					},
-					{
-						ID: "F1-R2",
-					},
-				},
-				Readers: []ValidationReader{
-					makeReader("F1-RDR1"),
-					makeReader("F1-RDR2"),
-					makeReader("F1-RDR3"),
-					makeReader("F1-RDR4"),
-				},
-			},
-			{
-				ID: "F2",
-				Regions: []ValidationRegion{
-					{
-						ID: "F2-R1",
-					},
-					{
-						ID: "F2-R2",
-					},
-				},
-				Readers: []ValidationReader{
-					makeReader("F2-RDR1"),
-					makeReader("F2-RDR2"),
-					makeReader("F2-RDR3"),
-					makeReader("F2-RDR4"),
-				},
-			},
-		},
+		SiteID: siteID,
+		Floors: floors,
 	}
+}
+
+func validationFloor(
+	id string,
+	regions []ValidationRegion,
+	readers ...ValidationReader,
+) ValidationFloor {
+	return ValidationFloor{
+		ID:      id,
+		Regions: regions,
+		Readers: readers,
+	}
+}
+
+func validationRegion(
+	id string,
+	children ...ValidationRegion,
+) ValidationRegion {
+	return ValidationRegion{
+		ID:      id,
+		Regions: children,
+	}
+}
+
+func validationReader(
+	id string,
+	ports ...int,
+) ValidationReader {
+	return ValidationReader{
+		ID:           id,
+		AntennaPorts: ports,
+	}
+}
+
+func assertCategory(
+	t *testing.T,
+	name string,
+	actual ValidationCategoryResult,
+	required int,
+	matched int,
+	passed bool,
+) {
+	t.Helper()
+
+	if actual.Required != required {
+		t.Errorf(
+			"%s.Required: want %d, got %d",
+			name,
+			required,
+			actual.Required,
+		)
+	}
+
+	if actual.Matched != matched {
+		t.Errorf(
+			"%s.Matched: want %d, got %d",
+			name,
+			matched,
+			actual.Matched,
+		)
+	}
+
+	if actual.Passed != passed {
+		t.Errorf(
+			"%s.Passed: want %t, got %t",
+			name,
+			passed,
+			actual.Passed,
+		)
+	}
+}
+
+func assertErrorContains(
+	t *testing.T,
+	result *ValidationResult,
+	expected string,
+) {
+	t.Helper()
+
+	for _, message := range result.Errors {
+		if strings.Contains(message, expected) {
+			return
+		}
+	}
+
+	t.Errorf(
+		"expected an error containing %q, got %v",
+		expected,
+		result.Errors,
+	)
+}
+
+func findMismatch(
+	t *testing.T,
+	result *ValidationResult,
+	predicate func(ValidationMismatch) bool,
+) ValidationMismatch {
+	t.Helper()
+
+	for _, mismatch := range result.Mismatches {
+		if predicate(mismatch) {
+			return mismatch
+		}
+	}
+
+	t.Fatalf(
+		"expected matching validation mismatch, got %v",
+		result.Mismatches,
+	)
+
+	return ValidationMismatch{}
 }
