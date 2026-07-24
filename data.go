@@ -1,35 +1,57 @@
-package cli
+func runMockServer(flags *Flags) int {
+	log, closer := initLogger(flags.Config)
+	defer closer.Close()
 
-import (
-	"io"
-	"os"
+	log.Info("Mock server command started")
 
-	commonlogger "altrfidtools/common/logger"
-	"altrfidtools/resonate-replay-engine/internal/config"
-)
+	if flags.Config == "" {
+		log.Info("Starting mock server without config on port %d", flags.Port)
 
-// initLogger creates the Replay Engine logger using the logging
-// configuration from config.json.
-//
-// If the config or log file cannot be loaded, logging falls back
-// to stderr so that command execution is not blocked.
-func initLogger(configPath string) (*commonlogger.Logger, io.Closer) {
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		return commonlogger.New(os.Stderr), nopCloser{}
+		if err := mocktarget.StartServer(flags.Port); err != nil {
+			log.Error("Mock server failed: %v", err)
+			return 1
+		}
+
+		log.Success("Mock server stopped")
+		return 0
 	}
 
-	log, closer, err := commonlogger.NewFromConfig(cfg.Logging)
+	cfg, err := config.Load(flags.Config)
 	if err != nil {
-		return commonlogger.New(os.Stderr), nopCloser{}
+		log.Error("Failed to load configuration: %v", err)
+		return 1
 	}
 
-	return log, closer
-}
+	siteGraphDir := cfg.SiteGraphDirectory
+	if siteGraphDir == "" {
+		siteGraphDir = "configs/sites"
+	}
 
-// nopCloser is used when the fallback stderr logger is active.
-type nopCloser struct{}
+	log.Info("Loading SiteGraphs from directory: %s", siteGraphDir)
 
-func (nopCloser) Close() error {
-	return nil
+	store, err := mocktarget.LoadSiteStore(siteGraphDir)
+	if err != nil {
+		log.Error("Failed to load SiteGraphs: %v", err)
+		return 1
+	}
+
+	port := flags.Port
+	if cfg.MockPort > 0 && flags.Port == 8080 {
+		port = cfg.MockPort
+	}
+
+	log.Success("Mock server starting on port %d", port)
+
+	if err := mocktarget.StartServerWithSiteStore(
+		port,
+		store,
+		flags.Config,
+		siteGraphDir,
+	); err != nil {
+		log.Error("Mock server stopped with error: %v", err)
+		return 1
+	}
+
+	log.Success("Mock server stopped")
+	return 0
 }
