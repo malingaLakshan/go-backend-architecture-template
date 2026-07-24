@@ -1,21 +1,22 @@
-## Summary
+## Resonate Replay Engine v0.3.0
 
-- Integrated the shared `common/logger` module into the Replay Engine.
-- Added logger configuration through `config.json`.
-- Replaced the Replay Engine-specific logger implementation.
-- Added logging to validate, play, summary, and mock-server workflows.
-- Added mock-server startup, failure, and shutdown-related logging.
-- Configured commands to append to the shared Replay Engine log file.
-- Updated related documentation and module dependencies.
+### Added
 
-## Validation
+- Integrated the shared ALTRFIDTools common logging module.
+- Added logger configuration through the Replay Engine configuration file.
+- Added logging for summary, validation, playback, and mock-server workflows.
+- Added mock-server lifecycle and error logging.
+- Added support for appending multiple command executions to the configured Replay Engine log file.
 
-- `go mod tidy`
-- `go test ./...`
-- `go vet ./...`
-- Replay Engine build completed successfully
-- Manually tested:
-  - `serve`
-  - `validate`
-  - `play`
-  - log file creation and appending
+### Changed
+
+- Replaced the Replay Engine-specific logger implementation with the shared logger.
+- Updated Replay Engine module dependencies and configuration model.
+- Updated documentation for architecture, commands, validation, and logging.
+
+### Validation
+
+- All automated tests passed.
+- Static analysis completed.
+- Release executable built successfully.
+- `serve`, `validate`, and `play` manually verified.
