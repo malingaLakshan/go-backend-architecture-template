@@ -1,31 +1,21 @@
-// GetRecordedSiteInfo retrieves the SiteInformation stored in the recording
-// without filtering by the configured Site ID.
-func GetRecordedSiteInfo(db *sql.DB) (*SiteInformation, error) {
-	row := db.QueryRow(`
-		SELECT site_information_id,
-		       recording_session_id,
-		       site_id,
-		       site_name,
-		       site_json
-		FROM SiteInformation
-		LIMIT 1
-	`)
-
-	var si SiteInformation
-
-	err := row.Scan(
-		&si.SiteInformationID,
-		&si.RecordingSessionID,
-		&si.SiteID,
-		&si.SiteName,
-		&si.SiteJSON,
+if flags.SiteID != siteInfo.SiteID {
+	log.Error(
+		"Configured Site ID %q does not match recorded Site ID %q",
+		flags.SiteID,
+		siteInfo.SiteID,
 	)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to get recorded site information: %w",
-			err,
-		)
-	}
 
-	return &si, nil
+	fmt.Println()
+	fmt.Println("Site Configuration Validation")
+	fmt.Println()
+	fmt.Println("Validation Results")
+	fmt.Println()
+	fmt.Println("X Site ID mismatch")
+	fmt.Println()
+	fmt.Printf("  Configured Site ID: %s\n", flags.SiteID)
+	fmt.Printf("  Recorded Site ID:   %s\n", siteInfo.SiteID)
+	fmt.Println()
+	fmt.Println("Validation failed.")
+
+	return 1
 }
