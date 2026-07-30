@@ -1,1 +1,1 @@
-Updated the Site Validation logic to correctly report region validation mismatches. The validator now returns the appropriate validation message based on the actual region comparison result instead of displaying an incorrect generic message when multiple region mismatches are present. Verified the fix by testing matching and mismatching SiteGraph configurations.
+Fixed the incorrect region mismatch validation message. Verified the fix with positive and negative SiteGraph validation scenarios. Ready for QA testing.
