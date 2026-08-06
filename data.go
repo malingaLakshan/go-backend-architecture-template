@@ -1,12 +1,14 @@
-Polish the current React UI shell only.
+Refine the existing React UI shell to more closely match the Jira mockup.
 
-Changes:
-- Increase the application width and height so it uses the browser space better and matches the provided mockup.
-- Remove the fake minimize, maximize, and close buttons from the header.
-- Keep a clean application header with only the title “Resonate Replay Engine”.
-- Improve spacing and alignment for the form sections.
+Requirements:
+- Keep this UI-only. Do not implement backend functionality.
+- Increase the main application width (around 1000px max-width).
+- Use more horizontal space while keeping the card centered.
+- Increase spacing and padding between sections.
+- Make the Target URL input stretch across the available width.
+- Keep the Connect button aligned to the right.
+- Increase the height of the Validation panel to prepare for future validation results.
+- Improve typography consistency (labels, spacing, margins).
 - Keep the Play button disabled.
-- Do not implement backend calls, validation, playback, or real SQLite loading.
-- For the Select Recording button, add a temporary disabled or non-functional placeholder state with clear text such as “Recording selection will be implemented in the next subtask”, so users are not confused.
-- Modify only files inside ui/.
-- Run npm run build and report the changed files.
+- Do not modify any Go backend files.
+- Only update React UI files.
