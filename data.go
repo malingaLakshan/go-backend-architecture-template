@@ -1,14 +1,12 @@
-Refine the existing React UI shell to more closely match the Jira mockup.
+Update the existing React UI shell to use the full application window instead of a centered dialog.
 
 Requirements:
-- Keep this UI-only. Do not implement backend functionality.
-- Increase the main application width (around 1000px max-width).
-- Use more horizontal space while keeping the card centered.
-- Increase spacing and padding between sections.
-- Make the Target URL input stretch across the available width.
-- Keep the Connect button aligned to the right.
-- Increase the height of the Validation panel to prepare for future validation results.
-- Improve typography consistency (labels, spacing, margins).
-- Keep the Play button disabled.
-- Do not modify any Go backend files.
-- Only update React UI files.
+- The main content should fill the browser window with reasonable margins (24-32px).
+- Remove the centered card appearance.
+- Use a full-page layout similar to the Jira mockup.
+- Keep the dark header spanning the full application width.
+- Keep all existing components and placeholder behavior.
+- Preserve the current architecture.
+- Do not implement backend functionality.
+- Do not modify any Go files.
+- React UI only.
