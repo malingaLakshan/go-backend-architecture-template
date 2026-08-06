@@ -1,87 +1,192 @@
-Implement the first Replay Engine UI subtask:
+You are working in an existing production-quality Go project.
+
+IMPORTANT CONTEXT
+
+This repository already contains a fully working Replay Engine backend and CLI.
+
+The CLI implementation is complete and production-ready.
+
+The objective of this task is ONLY to begin implementing a new React UI for the existing backend.
+
+The UI will consume backend APIs in future subtasks. Do NOT redesign or replace the backend.
+
+The attached UI mockup images are the design reference for this task.
+
+A future sprint will introduce a Playback Dashboard (progress, metrics, activity log, stop playback, etc.). Please design the architecture so it can easily support those future features, but DO NOT implement them now.
+
+======================================================================
+IMPORTANT CONSTRAINTS
+======================================================================
+
+DO NOT modify any existing Go backend functionality.
+
+Specifically, DO NOT change:
+
+- Replay logic
+- Playback timing/pacing
+- Validation logic
+- Recording logic
+- SQLite logic
+- Site loading logic
+- Mock target behavior
+- CLI commands
+- Existing APIs
+- Config loading
+- Logger
+- Existing tests
+- Existing package names
+- Existing folder structure outside the UI
+
+Treat the current backend as production-ready.
+
+If backend functionality appears to be missing, prepare only the frontend service layer or interface. Do NOT implement or modify backend code.
+
+Only create or modify files required for the React UI.
+
+======================================================================
+TASK
+======================================================================
+
+Implement ONLY the first Jira subtask:
 
 [RRE][IMP][UI] Create application shell and base layout
 
-Context:
-- This repository already contains a working Go-based Replay Engine CLI and backend packages.
-- The CLI must continue working unchanged.
-- We are adding a React UI for the existing backend.
-- The attached screenshots are the required visual reference for the current configuration screen.
-- A playback dashboard will be implemented in a future story, so keep the structure extensible, but do not implement dashboard functionality now.
+Do NOT continue into later subtasks.
 
-Requirements:
-1. Create a React + TypeScript UI using Vite inside:
+======================================================================
+REQUIREMENTS
+======================================================================
 
-   resonate-replay-engine/ui
+Create a new React + TypeScript application using Vite inside:
 
-2. Use a clean, professional, feature-based architecture suitable for future backend API integration.
+resonate-replay-engine/ui
 
-3. Create the application shell and base configuration-page layout matching the attached mockup as closely as reasonably possible.
+Use a clean, professional, scalable architecture suitable for enterprise applications.
 
-4. The screen must include these UI sections:
-   - Application header titled "Resonate Replay Engine"
-   - Configuration tab or configuration section
-   - Target Resonate URL input
-   - Connect button
-   - Target Site dropdown
-   - Select Recording button
-   - Selected recording information area
-   - Site validation status area
-   - Play button
+Recommended structure:
 
-5. For this subtask only:
-   - Use local placeholder state.
-   - Do not add real API calls.
-   - Do not create or modify Go backend endpoints.
-   - Do not duplicate validation or replay logic in React.
-   - The Play button must be disabled by default.
-   - Site dropdown and recording information may use empty placeholder states.
-   - Include visual placeholders for validation success and failure states, but do not implement validation behavior yet.
+ui/
+    src/
+        app/
+        features/
+            replay/
+                components/
+                hooks/
+                services/
+                types/
+                utils/
+        shared/
+            components/
+            styles/
+        layouts/
+        pages/
+        App.tsx
+        main.tsx
 
-6. Prepare the structure for later integration with the existing Go backend using separate API, service, hook, and type layers.
+Do not over-engineer the project.
 
-7. Use a simple structure similar to:
+Use simple React patterns.
 
-   ui/src/
-     app/
-     features/replay/components/
-     features/replay/hooks/
-     features/replay/services/
-     features/replay/types/
-     shared/components/
-     shared/styles/
+Do not introduce Redux.
 
-   Keep it practical and avoid unnecessary abstractions.
+Use React state only.
 
-8. Do not add Redux or another external state-management library. Use React state only for this shell.
+======================================================================
+UI REQUIREMENTS
+======================================================================
 
-9. Use accessible HTML:
-   - Proper labels for inputs
-   - Keyboard-accessible buttons
-   - Disabled states
-   - Semantic headings
-   - Clear focus styles
+Build the Configuration screen matching the attached mockup.
 
-10. Keep styling clean, simple, responsive, and close to the attached mockup. Avoid excessive animations or decorative UI.
+Include:
 
-11. Do not modify existing Go CLI, replay, validation, recording, site, logger, config, or pacing logic.
+• Application title/header
 
-12. Add basic component tests only if the repository already has an established React testing setup. Otherwise, do not add a large testing framework in this subtask.
+• Configuration section
 
-13. Update or add a short UI README containing:
-   - prerequisites;
-   - npm install;
-   - npm run dev;
-   - npm run build.
+• Target Resonate URL textbox
 
-Before editing:
-- Inspect the repository structure.
-- Confirm the proposed files and approach briefly.
-- Modify only the files required for this subtask.
+• Connect button
 
-After implementation:
-- Run npm install if necessary.
-- Run npm run build.
-- Show the exact files created or changed.
-- Summarize any assumptions.
-- Do not continue into target connection, file selection, validation integration, or playback integration.
+• Target Site dropdown
+
+• Select Recording button
+
+• Recording information panel
+
+• Validation status panel
+
+• Play button
+
+For this task:
+
+- Use placeholder/local state only.
+- No backend calls.
+- No HTTP requests.
+- No API implementation.
+- No playback logic.
+- No validation logic.
+
+The Play button must remain disabled.
+
+Use realistic placeholder values only where necessary.
+
+======================================================================
+QUALITY
+======================================================================
+
+Use:
+
+- Functional components
+- TypeScript
+- Reusable components
+- Accessible HTML
+- Responsive layout
+- Clean folder separation
+- Clear naming
+- Professional code style
+
+Avoid unnecessary dependencies.
+
+Avoid unnecessary abstractions.
+
+======================================================================
+FUTURE PREPARATION
+======================================================================
+
+Although only implementing the Configuration page, prepare the architecture so future stories can easily add:
+
+- Playback Dashboard
+- Progress updates
+- Activity Log
+- Stop Playback
+- Live metrics
+- API integration
+
+Do NOT implement those features now.
+
+Only prepare the structure.
+
+======================================================================
+DOCUMENTATION
+======================================================================
+
+Create a short README inside the ui folder explaining:
+
+- prerequisites
+- npm install
+- npm run dev
+- npm run build
+
+======================================================================
+BEFORE CODING
+======================================================================
+
+First inspect the existing repository.
+
+Briefly explain:
+
+- proposed architecture
+- files to be created
+- assumptions
+
+Wait for my confirmation before generating or modifying any files.
