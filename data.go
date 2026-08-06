@@ -1,5 +1,2 @@
-# React / Node
-node_modules/
-dist/
-.vite/
-*.log
+git rm -r --cached --ignore-unmatch alt-rfid-tools/resonate-replay-engine/ui/node_modules
+git rm -r --cached --ignore-unmatch alt-rfid-tools/resonate-replay-engine/ui/dist
