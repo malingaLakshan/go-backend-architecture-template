@@ -1,144 +1,87 @@
-// Run replays all RawReads with real-time pacing.
-// It respects context cancellation for Ctrl+C handling.
-func (s *Service) Run(
-	ctx context.Context,
-	reads []recording.RawRead,
-) *Status {
-	status := NewStatus(len(reads))
-	status.StartTime = time.Now()
+Implement the first Replay Engine UI subtask:
 
-	s.Logger.Info("Playback started, total records: %d", len(reads))
+[RRE][IMP][UI] Create application shell and base layout
 
-	// Open replay output file.
-	outputPath := filepath.Join(replayOutputDir, replayOutputFile)
+Context:
+- This repository already contains a working Go-based Replay Engine CLI and backend packages.
+- The CLI must continue working unchanged.
+- We are adding a React UI for the existing backend.
+- The attached screenshots are the required visual reference for the current configuration screen.
+- A playback dashboard will be implemented in a future story, so keep the structure extensible, but do not implement dashboard functionality now.
 
-	if err := os.MkdirAll(replayOutputDir, 0o755); err != nil {
-		s.Logger.Error("Failed to create output directory: %v", err)
-		status.State = "failed"
-		status.EndTime = time.Now()
-		return status
-	}
+Requirements:
+1. Create a React + TypeScript UI using Vite inside:
 
-	outputFile, err := os.Create(outputPath)
-	if err != nil {
-		s.Logger.Error("Failed to create replay output file: %v", err)
-		status.State = "failed"
-		status.EndTime = time.Now()
-		return status
-	}
-	defer outputFile.Close()
+   resonate-replay-engine/ui
 
-	// Anchor all records to one absolute replay timeline.
-	// This prevents payload processing and HTTP request time from
-	// accumulating between consecutive records.
-	replayStart := time.Now()
+2. Use a clean, professional, feature-based architecture suitable for future backend API integration.
 
-	var firstInjectionTime time.Time
-	if len(reads) > 0 {
-		firstInjectionTime = reads[0].InjectionTime
-	}
+3. Create the application shell and base configuration-page layout matching the attached mockup as closely as reasonably possible.
 
-	for i, read := range reads {
-		// Check for cancellation before processing each record.
-		select {
-		case <-ctx.Done():
-			s.Logger.Warn("Playback aborted by user")
-			status.State = "aborted"
-			status.EndTime = time.Now()
-			return status
-		default:
-		}
+4. The screen must include these UI sections:
+   - Application header titled "Resonate Replay Engine"
+   - Configuration tab or configuration section
+   - Target Resonate URL input
+   - Connect button
+   - Target Site dropdown
+   - Select Recording button
+   - Selected recording information area
+   - Site validation status area
+   - Play button
 
-		isFirst := i == 0
+5. For this subtask only:
+   - Use local placeholder state.
+   - Do not add real API calls.
+   - Do not create or modify Go backend endpoints.
+   - Do not duplicate validation or replay logic in React.
+   - The Play button must be disabled by default.
+   - Site dropdown and recording information may use empty placeholder states.
+   - Include visual placeholders for validation success and failure states, but do not implement validation behavior yet.
 
-		// Calculate the absolute scheduled time of this record.
-		targetOffset := read.InjectionTime.Sub(firstInjectionTime)
-		targetTime := replayStart.Add(targetOffset)
-		delay := time.Until(targetTime)
+6. Prepare the structure for later integration with the existing Go backend using separate API, service, hook, and type layers.
 
-		// Wait only for the remaining time.
-		// If playback is already late, send immediately to catch up.
-		if delay > 0 {
-			timer := time.NewTimer(delay)
+7. Use a simple structure similar to:
 
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				s.Logger.Warn(
-					"Playback aborted by user during pacing wait",
-				)
-				status.State = "aborted"
-				status.EndTime = time.Now()
-				return status
+   ui/src/
+     app/
+     features/replay/components/
+     features/replay/hooks/
+     features/replay/services/
+     features/replay/types/
+     shared/components/
+     shared/styles/
 
-			case <-timer.C:
-			}
-		}
+   Keep it practical and avoid unnecessary abstractions.
 
-		// Build the ProtoReaderBundle payload from the RawRead.
-		payload, err := BuildPayload(&read, s.SiteID)
-		if err != nil {
-			s.Logger.Error(
-				"Failed to build payload for ReadID %s: %v",
-				read.ReadID,
-				err,
-			)
-			status.RecordFailure()
-			continue
-		}
+8. Do not add Redux or another external state-management library. Use React state only for this shell.
 
-		// Serialize the payload for the output file and sending.
-		payloadJSON, err := json.Marshal(payload)
-		if err != nil {
-			s.Logger.Error(
-				"Failed to marshal payload for ReadID %s: %v",
-				read.ReadID,
-				err,
-			)
-			status.RecordFailure()
-			continue
-		}
+9. Use accessible HTML:
+   - Proper labels for inputs
+   - Keyboard-accessible buttons
+   - Disabled states
+   - Semantic headings
+   - Clear focus styles
 
-		// Write to replay output file.
-		fmt.Fprintln(outputFile, string(payloadJSON))
+10. Keep styling clean, simple, responsive, and close to the attached mockup. Avoid excessive animations or decorative UI.
 
-		// Print the first payload to the terminal.
-		if isFirst {
-			prettyJSON, _ := json.MarshalIndent(payload, "", "  ")
+11. Do not modify existing Go CLI, replay, validation, recording, site, logger, config, or pacing logic.
 
-			fmt.Println()
-			fmt.Println("First replay output payload:")
-			fmt.Println(string(prettyJSON))
-			fmt.Println()
-		}
+12. Add basic component tests only if the repository already has an established React testing setup. Otherwise, do not add a large testing framework in this subtask.
 
-		// Send to target.
-		if err := s.Injector.Send(payload); err != nil {
-			s.Logger.Error(
-				"Failed to send ReadID %s at %s: %v",
-				read.ReadID,
-				read.InjectionTime.Format(time.RFC3339Nano),
-				err,
-			)
-			status.RecordFailure()
-			continue
-		}
+13. Update or add a short UI README containing:
+   - prerequisites;
+   - npm install;
+   - npm run dev;
+   - npm run build.
 
-		status.RecordSuccess()
-	}
+Before editing:
+- Inspect the repository structure.
+- Confirm the proposed files and approach briefly.
+- Modify only the files required for this subtask.
 
-	status.State = "completed"
-	if status.Failed > 0 {
-		status.State = "completed_with_errors"
-	}
-
-	status.EndTime = time.Now()
-
-	s.Logger.Info(
-		"Playback finished, successful: %d, failed: %d",
-		status.Successful,
-		status.Failed,
-	)
-
-	return status
-}
+After implementation:
+- Run npm install if necessary.
+- Run npm run build.
+- Show the exact files created or changed.
+- Summarize any assumptions.
+- Do not continue into target connection, file selection, validation integration, or playback integration.
