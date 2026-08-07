@@ -1,59 +1,74 @@
-Implement a new CLI command:
+Approved. Implement exactly the proposed changes.
 
-rre ui
+Requirements
 
-Purpose:
-Start the Replay Engine browser UI and its HTTP API together for QA/development use.
+1. Add a new CLI command:
 
-Expected workflow:
+   rre ui
 
-1. `rre serve`
-   - starts the existing mock Resonate target
-   - example target URL: http://localhost:8080
+2. `rre ui` must:
+- start the existing Replay Engine UI/API server;
+- default to port 9090;
+- serve the built React app from `ui/dist`;
+- expose the existing `/api/v1/*` endpoints from the same server;
+- open the UI at http://localhost:9090;
+- not start the mock target automatically.
 
-2. `rre ui`
-   - starts the Replay Engine UI/API server
-   - default port: 9090
+3. Keep `rre serve` unchanged.
+It continues to start the local mock Resonate target (e.g. localhost:8080).
 
-3. QA opens:
-   http://localhost:9090
+4. Update `rre help`.
 
-4. QA enters:
-   http://localhost:8080
+Keep the current format.
 
-5. Connect retrieves the available sites from the existing mock target.
+Recommended workflow:
 
-Requirements:
+1. rre summary
+2. rre serve
+3. rre ui
+4. rre sites
+5. rre validate
+6. rre play
+7. rre kill
 
-- Reuse the existing API server implementation already added for `/api/v1/...`.
-- Serve the built React production files from `ui/dist`.
-- Serve both:
-  - `/api/v1/...` API routes
-  - React UI/static assets
-  from the same HTTP server/port.
-- Visiting `/` must load the React application.
-- React client-side routes, if any are added later, should safely fall back to `index.html` without intercepting `/api/*`.
-- Default UI port should be 9090.
-- Support an optional port argument only if consistent with the existing CLI style.
-- If `ui/dist` is missing, return a clear startup error telling the developer to run the React production build.
-- Use the existing common logger.
-- Handle graceful shutdown using context/OS signals where practical.
+Available commands:
 
-Strict constraints:
-- Do NOT change the behavior of existing commands such as `serve`, `play`, `validate`, `summary`, or `kill`.
-- Do NOT modify replay, pacing, validation, recording, SQLite, mock-target, config-loading, or existing business logic.
-- Do NOT require Node.js or `npm run dev` for QA runtime.
-- Do NOT automatically start the mock target from `rre ui`.
-- Keep `rre serve` and `rre ui` as separate responsibilities.
-- Keep changes minimal and production quality.
+rre summary    Summarize a recorded site configuration
+rre serve      Start the target server
+rre ui         Start the Replay Engine UI
+rre sites      List all available sites
+rre validate   Validate recorded site configurations against target site
+rre play       Replay RawReads into target Resonate
+rre kill       Kill the server
 
-Development/QA target flow must remain:
+Keep "Recommended workflow" and "Available commands" as separate sections exactly like today. Do not add unnecessary text.
 
-`rre serve` -> mock Resonate target
-`rre ui`    -> Replay Engine UI + API
+5. Update README.md with a short "Local Mock / QA" section:
 
-Before editing:
-- inspect the existing CLI command registration and current UI API server;
-- list the exact files you intend to modify;
-- explain briefly how `/api` and React static-file routing will coexist;
-- WAIT for my confirmation before changing files.
+1. Run `rre serve`
+2. Run `rre ui`
+3. Open `http://localhost:9090`
+4. Enter `http://localhost:8080`
+5. Click Connect
+
+Also mention:
+- `rre serve` is only required for the local mock target.
+- For a real deployment, run `rre ui` and enter the real Resonate target URL.
+
+6. If `ui/dist` does not exist, `rre ui` must return a clear error telling the user to build the React UI first.
+
+7. Reuse the existing UI/API server. Keep the implementation minimal.
+
+Strict constraints
+
+- Do NOT change the behavior of `serve`, `summary`, `sites`, `validate`, `play`, or `kill`.
+- Do NOT modify replay, pacing, recording, validation, SQLite, config loading, mock target, logger, or existing business logic.
+- Do NOT require `npm run dev` or Node.js at QA runtime.
+- Do NOT add unrelated commands or features.
+
+After implementation:
+- run the relevant Go tests;
+- run `npm run build`;
+- confirm `ui/dist` exists;
+- show all modified files;
+- show the exact command to rebuild `rre.exe`.
