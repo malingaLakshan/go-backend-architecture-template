@@ -1,74 +1,101 @@
-Approved. Implement exactly the proposed changes.
+Implement ONLY this Jira subtask:
+
+[RRE][IMP][UI] Implement recording selection and automatic validation
+
+Context
+
+- The React UI already connects to the existing backend.
+- Target URL connection and Target Site selection are already working.
+- Replay Engine CLI/backend business logic already exists and must be reused.
+- Do NOT duplicate recording parsing or validation logic.
 
 Requirements
 
-1. Add a new CLI command:
+1. Allow selecting a recording SQLite database.
+- Accept only `.sqlite` files.
+- Show the selected file name in the UI.
+- Do not hardcode file paths.
 
-   rre ui
+2. Add the minimum backend API required for file selection and validation.
+Reuse existing recording parsing and validation services.
+Do NOT copy business logic.
 
-2. `rre ui` must:
-- start the existing Replay Engine UI/API server;
-- default to port 9090;
-- serve the built React app from `ui/dist`;
-- expose the existing `/api/v1/*` endpoints from the same server;
-- open the UI at http://localhost:9090;
-- not start the mock target automatically.
+3. After BOTH are available:
+- Connected Target Site
+- Selected recording
 
-3. Keep `rre serve` unchanged.
-It continues to start the local mock Resonate target (e.g. localhost:8080).
+automatically trigger the existing validation logic.
 
-4. Update `rre help`.
+No Validate button.
 
-Keep the current format.
+4. Validation must use the existing backend implementation already used by the CLI.
 
-Recommended workflow:
+Do not implement validation in React.
 
-1. rre summary
-2. rre serve
-3. rre ui
-4. rre sites
-5. rre validate
-6. rre play
-7. rre kill
+5. Update the Validation panel.
 
-Available commands:
+Display:
+- Loading while validating
+- Validation success
+- Validation failure
+- Existing validation message/details returned by the backend
 
-rre summary    Summarize a recorded site configuration
-rre serve      Start the target server
-rre ui         Start the Replay Engine UI
-rre sites      List all available sites
-rre validate   Validate recorded site configurations against target site
-rre play       Replay RawReads into target Resonate
-rre kill       Kill the server
+6. Behaviour
 
-Keep "Recommended workflow" and "Available commands" as separate sections exactly like today. Do not add unnecessary text.
+Changing:
+- Target URL
+- Target Site
+- Recording
 
-5. Update README.md with a short "Local Mock / QA" section:
+must clear the previous validation result and automatically revalidate when all required inputs are available.
 
-1. Run `rre serve`
-2. Run `rre ui`
+7. Play button
+
+- Keep disabled until validation succeeds.
+- Do NOT implement playback in this subtask.
+
+8. API
+
+Reuse existing services.
+
+Expose only the minimal endpoints required for:
+- recording selection
+- automatic validation
+
+Use the existing logger, request context and reasonable timeouts.
+
+9. Documentation
+
+Update README.md with the new workflow.
+
+Local Mock / QA flow
+
+1. `rre serve`
+2. `rre ui`
 3. Open `http://localhost:9090`
-4. Enter `http://localhost:8080`
-5. Click Connect
-
-Also mention:
-- `rre serve` is only required for the local mock target.
-- For a real deployment, run `rre ui` and enter the real Resonate target URL.
-
-6. If `ui/dist` does not exist, `rre ui` must return a clear error telling the user to build the React UI first.
-
-7. Reuse the existing UI/API server. Keep the implementation minimal.
+4. Enter target URL (e.g. `http://localhost:8080`)
+5. Connect
+6. Select Target Site
+7. Select Recording (.sqlite)
+8. Validation starts automatically
+9. Play becomes enabled only after successful validation
 
 Strict constraints
 
-- Do NOT change the behavior of `serve`, `summary`, `sites`, `validate`, `play`, or `kill`.
-- Do NOT modify replay, pacing, recording, validation, SQLite, config loading, mock target, logger, or existing business logic.
-- Do NOT require `npm run dev` or Node.js at QA runtime.
-- Do NOT add unrelated commands or features.
+- Reuse the existing recording parser, SQLite reader and validation services.
+- Do NOT duplicate business logic.
+- Do NOT modify replay, pacing, serve, summary, sites, config loading, logger or mock-target behaviour.
+- Do NOT implement playback.
+- Do NOT add future Jira functionality.
+- Keep changes minimal and production quality.
+
+Before editing:
+- inspect the existing recording parsing and validation flow;
+- list only the files that will be modified;
+- wait for my confirmation before changing files.
 
 After implementation:
-- run the relevant Go tests;
+- run relevant Go tests;
 - run `npm run build`;
-- confirm `ui/dist` exists;
-- show all modified files;
-- show the exact command to rebuild `rre.exe`.
+- report all modified files;
+- describe how to manually verify the feature.
