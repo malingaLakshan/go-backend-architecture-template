@@ -1,1 +1,1 @@
-sudo find /opt/zebra/alt-resonate-locate/svc -maxdepth 3 -type f \( -iname "*.json" -o -iname "*.yml" -o -iname "*.yaml" -o -iname "*.conf" -o -iname "*.properties" \) -print | sort
+for p in /swagger/index.html /swagger-ui/index.html /swagger.json /openapi.json /v3/api-docs /docs; do code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080$p"); echo "$code  $p"; done
