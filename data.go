@@ -1,1 +1,1 @@
-sudo grep -RniE 'SerializeToString|_pb2|protobuf|rawrfid' /data/sim --exclude-dir=venv
+sudo grep -nEi 'import|SerializeToString|publish|rawrfid|protobuf|pb2' /data/sim/sim.py
