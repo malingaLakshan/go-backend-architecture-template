@@ -1,1 +1,1 @@
-sudo grep -nEi -C 3 'rawrfid|raw.?read|mlt|sow|location|event|mqtt|kafka|zmq|pubsub|topic|stream' /opt/zebra/alt-resonate-locate/svc/docker-compose.yml
+timeout 20s mosquitto_sub -h localhost -p 1883 -t 'resonate/locate/+/rawrfid' -C 1 -F 'topic=%t | payload_bytes=%l | qos=%q'
