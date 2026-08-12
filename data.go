@@ -1,1 +1,1 @@
-sudo docker compose -f /opt/zebra/alt-resonate-locate/svc/docker-compose.yml config 2>&1 | grep -nEi 'generate.*event|rfid.?exit|pos.?event|event.*topic|topic.*event'
+mm
