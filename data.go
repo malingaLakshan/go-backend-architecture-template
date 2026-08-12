@@ -1,1 +1,1 @@
-timeout 20s mosquitto_sub -h localhost -p 1883 -t 'resonate/locate/+/rawrfid' -C 1 -F 'topic=%t | payload_bytes=%l | qos=%q'
+sudo docker compose -f /opt/zebra/alt-resonate-locate/svc/docker-compose.yml logs --since 2h --no-color 2>&1 | grep -iE 'rfid.?exit|pos.?event|resonate.?event|event.*(created|generated|published|sent)' | tail -n 100
