@@ -1,1 +1,1 @@
-for p in /swagger/index.html /swagger-ui/index.html /swagger.json /openapi.json /v3/api-docs /docs; do code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080$p"); echo "$code  $p"; done
+sudo grep -nEi -C 3 'rawrfid|raw.?read|mlt|sow|location|event|mqtt|kafka|zmq|pubsub|topic|stream' /opt/zebra/alt-resonate-locate/svc/docker-compose.yml
