@@ -1,1 +1,1 @@
-sudo docker compose -f /opt/zebra/alt-resonate-locate/svc/docker-compose.yml config 2>&1 | grep -nEi -B 15 -A 20 'RFIDExitDistance'
+sudo grep -nEi 'event|rfid|pos|exit|mqtt|topic|publish' /opt/zebra/alt-resonate-locate/svc/location-service/config.json
