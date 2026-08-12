@@ -1,1 +1,1 @@
-sudo grep -nEi 'event|rfid|pos|exit|mqtt|topic|publish' /opt/zebra/alt-resonate-locate/svc/location-service/config.json
+sudo docker exec mqtt emqx ctl clients show smartlens-ingest-1
