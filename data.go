@@ -1,1 +1,1 @@
-sudo grep -nEi 'import|SerializeToString|publish|rawrfid|protobuf|pb2' /data/sim/sim.py
+sudo find /data/sim -maxdepth 3 -type f \( -name "*.proto" -o -name "messages_pb2.py" \) -print
