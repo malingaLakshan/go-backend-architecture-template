@@ -1,1 +1,1 @@
-for path in /swagger/v1/swagger.json /swagger.json /v3/api-docs /openapi.json /api-docs; do printf "%-30s " "$path"; curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:8080$path"; done
+sudo docker logs alt-sl-api-service 2>&1 | grep -Ei "mapped|route|endpoint|controller|site|listening" | tail -n 100
