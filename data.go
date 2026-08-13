@@ -1,1 +1,1 @@
-sudo docker logs alt-sl-application-service 2>&1 | grep -Ei 'event|mqtt|topic|publish|location' | tail -n 100
+sudo docker inspect alt-sl-datafeed-service --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -Ei 'event|mqtt|topic|kafka'
