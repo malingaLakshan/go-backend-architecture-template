@@ -1,1 +1,1 @@
-sudo docker logs alt-sl-api-service 2>&1 | grep -Ei "mapped|route|endpoint|controller|site|listening" | tail -n 100
+sudo docker logs alt-sl-application-service 2>&1 | grep -Ei 'event|mqtt|topic|publish|location' | tail -n 100
