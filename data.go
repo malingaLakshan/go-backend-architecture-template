@@ -1,17 +1,12 @@
-cd /data/sim
+Resonate Replay Engine v0.4.1
 
-./venv/bin/python3 - <<'PY'
-import messages_pb2
+This release contains bug fixes and minor improvements to the Replay Engine.
 
-bundle_schema = messages_pb2.ProtoReaderBundle.DESCRIPTOR
+Changes
 
-print("PROTOREADERBUNDLE FIELDS:")
-for field in bundle_schema.fields:
-    print(f"Field {field.number}: {field.name}")
+* Fixed reported QA issues.
+* Improved command messages and user-facing output.
+* Updated configuration-related behavior and supporting documentation.
+* Included minor stability and usability fixes.
 
-reads_schema = bundle_schema.fields_by_name["reads"].message_type
-
-print("\nINDIVIDUAL RAW READ FIELDS:")
-for field in reads_schema.fields:
-    print(f"Field {field.number}: {field.name}")
-PY
+No new UI functionality is included in this release.
