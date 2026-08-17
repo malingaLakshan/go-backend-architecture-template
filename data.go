@@ -1,5 +1,1 @@
-sudo docker cp alt-sl-location-service:/app/location_service ./location_service.    
-
-
-
-
+strings ./location_service | grep -i -B 25 -A 25 'item_id'
