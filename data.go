@@ -1,110 +1,227 @@
 cd /data/sim
 
 ./venv/bin/python3 - <<'PY'
+import math
+import os
+import struct
+
 import paho.mqtt.client as mqtt
-import messages_pb2
 
 SITE_ID = "3b96f652-8200-3920-8a2c-0486c358964e"
-RAW_TOPIC = f"resonate/locate/{SITE_ID}/rawrfid"
+TOPIC = f"resonate/locate/{SITE_ID}/locationUpdate"
 
 message_count = 0
-total_reads = 0
 
 
-def print_fields(protobuf_message):
-    populated = {
-        field.name: value
-        for field, value in protobuf_message.ListFields()
-    }
+def read_varint(data, position):
+    value = 0
+    shift = 0
 
-    for field in protobuf_message.DESCRIPTOR.fields:
-        if field.name in populated:
-            print(
-                f"  Field {field.number} - "
-                f"{field.name}: {populated[field.name]}"
+    while position < len(data) and shift < 70:
+        byte = data[position]
+        position += 1
+        value |= (byte & 0x7F) << shift
+
+        if not byte & 0x80:
+            return value, position
+
+        shift += 7
+
+    raise ValueError("Invalid varint")
+
+
+def readable_text(data):
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+    if text and all(
+        char.isprintable() or char in "\r\n\t"
+        for char in text
+    ):
+        return text
+
+    return None
+
+
+def format_float(value):
+    if not math.isfinite(value):
+        return str(value)
+
+    return f"{value:.9g}"
+
+
+def decode_fields(data, level=0):
+    lines = []
+    position = 0
+    indent = "  " * level
+
+    while position < len(data):
+        key, position = read_varint(data, position)
+
+        field_number = key >> 3
+        wire_type = key & 7
+
+        if field_number == 0:
+            raise ValueError("Invalid field number")
+
+        # Varint: integer, boolean, enum or timestamp
+        if wire_type == 0:
+            value, position = read_varint(data, position)
+
+            lines.append(
+                f"{indent}Field {field_number} "
+                f"(integer/varint): {value}"
             )
+
+        # Fixed 64-bit value
+        elif wire_type == 1:
+            end = position + 8
+
+            if end > len(data):
+                raise ValueError("Truncated fixed64")
+
+            raw = data[position:end]
+            position = end
+
+            integer_value = struct.unpack("<Q", raw)[0]
+            double_value = struct.unpack("<d", raw)[0]
+
+            lines.append(
+                f"{indent}Field {field_number} (fixed64): "
+                f"integer={integer_value}, "
+                f"double={format_float(double_value)}"
+            )
+
+        # String, bytes or embedded Protobuf message
+        elif wire_type == 2:
+            size, position = read_varint(data, position)
+            end = position + size
+
+            if end > len(data):
+                raise ValueError("Truncated field")
+
+            raw = data[position:end]
+            position = end
+
+            text = readable_text(raw)
+
+            if text is not None:
+                lines.append(
+                    f"{indent}Field {field_number} "
+                    f"(string): {text!r}"
+                )
+
+            else:
+                try:
+                    nested = decode_fields(raw, level + 1)
+
+                    if not nested:
+                        raise ValueError("Empty embedded value")
+
+                except Exception:
+                    value = raw.hex()
+
+                    if len(value) > 160:
+                        value = value[:160] + "..."
+
+                    lines.append(
+                        f"{indent}Field {field_number} "
+                        f"(bytes, {len(raw)} bytes): 0x{value}"
+                    )
+
+                else:
+                    lines.append(
+                        f"{indent}Field {field_number} "
+                        "(embedded message) {"
+                    )
+
+                    lines.extend(nested)
+                    lines.append(f"{indent}}}")
+
+        # Fixed 32-bit value
+        elif wire_type == 5:
+            end = position + 4
+
+            if end > len(data):
+                raise ValueError("Truncated fixed32")
+
+            raw = data[position:end]
+            position = end
+
+            integer_value = struct.unpack("<I", raw)[0]
+            float_value = struct.unpack("<f", raw)[0]
+
+            lines.append(
+                f"{indent}Field {field_number} (fixed32): "
+                f"integer={integer_value}, "
+                f"float={format_float(float_value)}"
+            )
+
         else:
-            print(
-                f"  Field {field.number} - "
-                f"{field.name}: <NOT SENT OR DEFAULT>"
+            raise ValueError(
+                f"Unsupported wire type: {wire_type}"
             )
 
+    return lines
 
-def on_connect(client, userdata, flags, reason_code, properties=None):
+
+def on_connect(
+    client,
+    userdata,
+    flags,
+    reason_code,
+    properties=None
+):
     print("Connected:", reason_code)
-    client.subscribe(RAW_TOPIC, qos=0)
-    print("Subscribed to:", RAW_TOPIC)
-    print("Continuously waiting for Raw RFID messages...")
+
+    client.subscribe(TOPIC, qos=0)
+
+    print("Subscribed to:", TOPIC)
+    print("Waiting continuously for Location messages...")
     print("Press Ctrl+C whenever you want to stop.")
 
 
 def on_message(client, userdata, mqtt_message):
-    global message_count, total_reads
-
-    bundle = messages_pb2.ProtoReaderBundle()
-
-    try:
-        bundle.ParseFromString(mqtt_message.payload)
-    except Exception as error:
-        print("Protobuf decoding failed:", error)
-        return
+    global message_count
 
     message_count += 1
-    total_reads += len(bundle.reads)
 
     print("\n" + "=" * 75)
-    print(f"RAW RFID MQTT MESSAGE #{message_count}")
+    print(f"LOCATION MQTT MESSAGE #{message_count}")
     print("=" * 75)
+
     print("Topic:", mqtt_message.topic)
     print("QoS:", mqtt_message.qos)
-    print("Payload size:", len(mqtt_message.payload), "bytes")
-    print("Protobuf type: ProtoReaderBundle")
+    print(
+        "Payload size:",
+        len(mqtt_message.payload),
+        "bytes"
+    )
 
-    print("\nALL BUNDLE FIELDS")
+    print("\nALL LOCATION FIELDS AND VALUES")
     print("-" * 75)
 
-    populated_bundle = {
-        field.name: value
-        for field, value in bundle.ListFields()
-    }
+    try:
+        fields = decode_fields(mqtt_message.payload)
 
-    for field in bundle.DESCRIPTOR.fields:
-        if field.name == "reads":
-            print(
-                f"  Field {field.number} - reads: "
-                f"{len(bundle.reads)} individual reads"
-            )
-        elif field.name in populated_bundle:
-            print(
-                f"  Field {field.number} - "
-                f"{field.name}: {populated_bundle[field.name]}"
-            )
-        else:
-            print(
-                f"  Field {field.number} - "
-                f"{field.name}: <NOT SENT OR DEFAULT>"
-            )
+        for field in fields:
+            print(field)
 
-    print("\nALL INDIVIDUAL READS")
-    print("-" * 75)
+    except Exception as error:
+        print("Protobuf wire decoding failed:", error)
 
-    for index, read in enumerate(bundle.reads, start=1):
-        print(f"\nREAD #{index}")
-        print_fields(read)
 
-    print("\nRUNNING TOTAL")
-    print("-" * 75)
-    print("MQTT messages received:", message_count)
-    print("Individual reads received:", total_reads)
-
+client_id = f"location-checker-{os.getpid()}"
 
 if hasattr(mqtt, "CallbackAPIVersion"):
     client = mqtt.Client(
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-        client_id="continuous-rawrfid-checker"
+        client_id=client_id
     )
 else:
-    client = mqtt.Client(client_id="continuous-rawrfid-checker")
+    client = mqtt.Client(client_id=client_id)
 
 client.on_connect = on_connect
 client.on_message = on_message
@@ -115,9 +232,11 @@ try:
     client.loop_forever()
 
 except KeyboardInterrupt:
-    print("\n\nStopped by user.")
-    print("Total MQTT messages:", message_count)
-    print("Total individual reads:", total_reads)
+    print("\nStopped by user.")
+    print(
+        "Total Location messages received:",
+        message_count
+    )
 
 finally:
     client.disconnect()
