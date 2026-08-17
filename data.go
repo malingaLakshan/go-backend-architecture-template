@@ -1,1 +1,1 @@
-strings ~/location_service | grep -o -i -E '.{0,400}floor_id.{0,900}' | head -20
+strings ~/location_service | fold -w 120 | grep -i -B 3 -A 8 floor_id | head -40
