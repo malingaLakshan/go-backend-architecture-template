@@ -1,1 +1,5 @@
-sudo docker inspect alt-sl-location-service --format 'WorkingDir={{.Config.WorkingDir}} Cmd={{json .Config.Cmd}}'
+sudo docker cp alt-sl-location-service:/app/location_service ./location_service.    
+
+
+
+
