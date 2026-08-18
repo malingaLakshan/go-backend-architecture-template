@@ -1,7 +1,15 @@
-sudo docker logs --since 10m alt-sl-datafeed-service 2>&1 \
-| grep -iE 'mqtt|broker|connect|publish|error|failed|exception|lab-json-events' \
-| tail -100.  sudo docker logs --since 10m mqtt 2>&1 | tail -100
-
-
-
-
+sudo docker exec mongodb mongosh \
+"mongodb://admin:admin@localhost:27017/location_engine?authSource=admin" \
+--quiet --eval '
+db.feed_configs.find({}).forEach(d => printjson({
+  feedId: d.feedId,
+  keys: Object.keys(d),
+  siteId: d.siteId,
+  status: d.status,
+  filters: d.filters,
+  pMode: d.pMode,
+  eventFilters: d.eventFilters,
+  filterMode: d.filterMode,
+  destination: d.destination
+}))
+'
