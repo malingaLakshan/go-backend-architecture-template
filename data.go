@@ -1,13 +1,8 @@
-curl -sS -w '\nHTTP %{http_code}\n' -X POST \
-"http://localhost:3000/siteId/3b96f652-8200-3920-8a2c-0486c358964e/Feeds" \
--H "Content-Type: application/json" \
--d '{
-  "feedId": "lab-json-events",
-  "eventFilters": [],
-  "filterMode": "STRICT",
-  "destination": {
-    "protocol": "MQTT",
-    "broker": "mqtt:1883",
-    "topic": "resonate/locate/3b96f652-8200-3920-8a2c-0486c358964e/events/json"
-  }
-}'
+sudo docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -E 'datafeed|3000'
+
+sudo docker port alt-sl-datafeed-service
+
+sudo docker inspect alt-sl-datafeed-service \
+--format 'WorkingDir={{.Config.WorkingDir}} Cmd={{json .Config.Cmd}} Entrypoint={{json .Config.Entrypoint}} ExposedPorts={{json .Config.ExposedPorts}}'
+
+sudo docker logs --tail 100 alt-sl-datafeed-service 2>&1
