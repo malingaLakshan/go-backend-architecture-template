@@ -1,15 +1,13 @@
-sudo docker exec mongodb mongosh \
-"mongodb://admin:admin@localhost:27017/location_engine?authSource=admin" \
---quiet --eval '
-db.feed_configs.find({}).forEach(d => printjson({
-  feedId: d.feedId,
-  keys: Object.keys(d),
-  siteId: d.siteId,
-  status: d.status,
-  filters: d.filters,
-  pMode: d.pMode,
-  eventFilters: d.eventFilters,
-  filterMode: d.filterMode,
-  destination: d.destination
-}))
-'
+curl -sS -w '\nHTTP %{http_code}\n' -X POST \
+"http://localhost:3000/siteId('3b96f652-8200-3920-8a2c-0486c358964e')/Feeds" \
+-H "Content-Type: application/json" \
+-d '{
+  "feedId": "lab-json-events-v2",
+  "filters": [],
+  "pMode": 1,
+  "destination": {
+    "protocol": "MQTT",
+    "broker": "mqtt:1883",
+    "topic": "resonate/locate/3b96f652-8200-3920-8a2c-0486c358964e/events/json"
+  }
+}'
