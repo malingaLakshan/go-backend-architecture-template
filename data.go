@@ -5,7 +5,12 @@ import paho.mqtt.client as mqtt
 
 BROKER = "127.0.0.1"
 PORT = 1883
-TOPIC = "resonate/locate/#"
+
+# Listen for Location messages from any site.
+TOPICS = [
+    ("resonate/locate/+/locationUpdate", 0),
+    ("resonate/locate/+/mlt_sow_locations", 0),
+]
 
 BUNDLE_NAMES = {
     1: "site_id",
@@ -26,8 +31,8 @@ LOCATION_NAMES = {
     11: "reason",
 }
 
-location_count = 0
-raw_count = 0
+mqtt_message_count = 0
+individual_location_count = 0
 
 
 def read_varint(data, position):
@@ -60,26 +65,56 @@ def parse_fields(data):
             value, position = read_varint(data, position)
 
         elif wire_type == 1:
-            value = data[position:position + 8]
-            position += 8
+            end = position + 8
+
+            if end > len(data):
+                raise ValueError("Incomplete fixed64 field")
+
+            value = data[position:end]
+            position = end
 
         elif wire_type == 2:
             size, position = read_varint(data, position)
-            value = data[position:position + size]
-            position += size
+            end = position + size
+
+            if end > len(data):
+                raise ValueError("Incomplete length-delimited field")
+
+            value = data[position:end]
+            position = end
 
         elif wire_type == 5:
-            value = data[position:position + 4]
-            position += 4
+            end = position + 4
+
+            if end > len(data):
+                raise ValueError("Incomplete fixed32 field")
+
+            value = data[position:end]
+            position = end
 
         else:
             raise ValueError(
-                "Unsupported wire type {}".format(wire_type)
+                "Unsupported Protobuf wire type: {}".format(wire_type)
             )
 
         fields.append((number, wire_type, value))
 
     return fields
+
+
+def readable_text(data):
+    try:
+        text = data.decode("utf-8")
+
+        if text and all(
+            character.isprintable() or character in "\r\n\t"
+            for character in text
+        ):
+            return text
+    except UnicodeDecodeError:
+        pass
+
+    return None
 
 
 def format_value(number, wire_type, value, location=False):
@@ -89,50 +124,47 @@ def format_value(number, wire_type, value, location=False):
     if wire_type == 1:
         return str(struct.unpack("<Q", value)[0])
 
+    if wire_type == 2:
+        text = readable_text(value)
+
+        if text is not None:
+            return text
+
+        return "0x" + value.hex()
+
     if wire_type == 5:
         float_value = struct.unpack("<f", value)[0]
 
         if location and number == 8:
             return str(float_value)
 
+        integer_value = struct.unpack("<I", value)[0]
+
         return "{} (uint32={})".format(
             float_value,
-            struct.unpack("<I", value)[0],
+            integer_value,
         )
-
-    if wire_type == 2:
-        try:
-            text = value.decode("utf-8")
-            if text and all(
-                character.isprintable() for character in text
-            ):
-                return text
-        except UnicodeDecodeError:
-            pass
-
-        return "0x" + value.hex()
 
     return str(value)
 
 
-def print_location(data, index):
-    print("Field 2 - locations #{} {{".format(index))
-
-    fields = parse_fields(data)
-    values_by_number = {}
+def print_location(location_data, location_number):
+    fields = parse_fields(location_data)
+    fields_by_number = {}
 
     for number, wire_type, value in fields:
-        values_by_number.setdefault(number, []).append(
+        fields_by_number.setdefault(number, []).append(
             (wire_type, value)
         )
 
-    # Display all currently identified fields.
+    print("\nLOCATION #{}".format(location_number))
+
     for number, name in LOCATION_NAMES.items():
-        values = values_by_number.get(number)
+        values = fields_by_number.get(number)
 
         if not values:
             print(
-                "  Field {} - {}: <NOT SENT; default 0>".format(
+                "  Field {} - {}: <NOT SENT OR DEFAULT>".format(
                     number,
                     name,
                 )
@@ -140,7 +172,7 @@ def print_location(data, index):
             continue
 
         for wire_type, value in values:
-            formatted = format_value(
+            formatted_value = format_value(
                 number,
                 wire_type,
                 value,
@@ -148,22 +180,22 @@ def print_location(data, index):
             )
 
             if number in (9, 11):
-                formatted += " (enum number)"
+                formatted_value += " (enum number)"
 
             print(
                 "  Field {} - {}: {}".format(
                     number,
                     name,
-                    formatted,
+                    formatted_value,
                 )
             )
 
-    # Display any additional fields automatically.
-    for number in sorted(values_by_number):
+    # Print any additional fields not currently identified.
+    for number in sorted(fields_by_number):
         if number in LOCATION_NAMES:
             continue
 
-        for wire_type, value in values_by_number[number]:
+        for wire_type, value in fields_by_number[number]:
             print(
                 "  Field {} - unknown_field_{}: {}".format(
                     number,
@@ -177,79 +209,94 @@ def print_location(data, index):
                 )
             )
 
-    print("}")
+
+def on_connect(client, userdata, flags, reason_code, properties=None):
+    print("Connected to MQTT:", reason_code)
+
+    client.subscribe(TOPICS)
+
+    print("Subscribed to:")
+    print("  resonate/locate/+/locationUpdate")
+    print("  resonate/locate/+/mlt_sow_locations")
+    print("\nWaiting continuously.")
+    print("Now run sim.py in another terminal.")
+    print("Press Ctrl+C to stop.")
 
 
-def decode_location_message(message):
-    global location_count
-    location_count += 1
+def on_message(client, userdata, message):
+    global mqtt_message_count
+    global individual_location_count
+
+    try:
+        bundle_fields = parse_fields(message.payload)
+    except Exception as error:
+        print("\nProtobuf decoding failed:", error)
+        return
+
+    mqtt_message_count += 1
+
+    locations = [
+        value
+        for number, wire_type, value in bundle_fields
+        if number == 2 and wire_type == 2
+    ]
 
     print("\n" + "=" * 78)
-    print("LOCATION MQTT MESSAGE #{}".format(location_count))
+    print("LOCATION MQTT MESSAGE #{}".format(mqtt_message_count))
     print("=" * 78)
     print("Topic:", message.topic)
     print("QoS:", message.qos)
     print("Payload size:", len(message.payload), "bytes")
-    print("\nALL LOCATION FIELDS AND VALUES")
+    print("Protobuf type: Location Bundle")
+
+    print("\nALL BUNDLE FIELDS")
     print("-" * 78)
 
-    fields = parse_fields(message.payload)
-    location_index = 0
+    present_bundle_fields = set()
 
-    for number, wire_type, value in fields:
+    for number, wire_type, value in bundle_fields:
+        present_bundle_fields.add(number)
+
+        if number == 2 and wire_type == 2:
+            continue
+
         name = BUNDLE_NAMES.get(
             number,
             "unknown_field_{}".format(number),
         )
 
-        if number == 2 and wire_type == 2:
-            location_index += 1
-            print_location(value, location_index)
-        else:
-            print(
-                "Field {} - {}: {}".format(
-                    number,
-                    name,
-                    format_value(number, wire_type, value),
-                )
-            )
-
-
-def on_connect(client, userdata, flags, reason_code, properties=None):
-    print("Connected to MQTT:", reason_code)
-    client.subscribe(TOPIC, qos=0)
-    print("Listening to:", TOPIC)
-    print("Now run sim.py in another terminal.")
-    print("Press Ctrl+C to stop.\n")
-
-
-def on_message(client, userdata, message):
-    global raw_count
-
-    topic_lower = message.topic.lower()
-
-    if topic_lower.endswith("/rawrfid"):
-        raw_count += 1
         print(
-            "[RAW RFID #{}] received: {} bytes from {}".format(
-                raw_count,
-                len(message.payload),
-                message.topic,
+            "  Field {} - {}: {}".format(
+                number,
+                name,
+                format_value(number, wire_type, value),
             )
         )
-        return
 
-    if (
-        topic_lower.endswith("/locationupdate")
-        or topic_lower.endswith("/mlt_sow_locations")
-    ):
-        try:
-            decode_location_message(message)
-        except Exception as error:
-            print("Location Protobuf decoding failed:", error)
+    print(
+        "  Field 2 - locations: {} individual locations".format(
+            len(locations)
+        )
+    )
+
+    print("\nALL INDIVIDUAL LOCATIONS")
+    print("-" * 78)
+
+    for index, location_data in enumerate(locations, start=1):
+        print_location(location_data, index)
+
+    individual_location_count += len(locations)
+
+    print("\nRUNNING TOTAL")
+    print("-" * 78)
+    print("MQTT messages received:", mqtt_message_count)
+    print(
+        "Individual locations received:",
+        individual_location_count,
+    )
 
 
-client_id = "location-check-{}".format(os.getpid())
+client_id = "location-protobuf-check-{}".format(os.getpid())
 
 try:
     client = mqtt.Client(
@@ -267,8 +314,11 @@ try:
     client.loop_forever()
 except KeyboardInterrupt:
     print("\nStopped by user.")
-    print("Raw RFID messages:", raw_count)
-    print("Location messages:", location_count)
+    print("MQTT messages received:", mqtt_message_count)
+    print(
+        "Individual locations received:",
+        individual_location_count,
+    )
 finally:
     client.disconnect()
 PY
