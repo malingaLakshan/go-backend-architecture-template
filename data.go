@@ -1,28 +1,31 @@
-[RRE][UI] Implement live playback metrics
+[RRE][UI] Implement playback Stop/Abort control
 
 Description:
 
-Implement live playback metrics in the Replay Engine Status dashboard.
+Implement the Stop/Abort control for an active Replay Engine playback session.
 
-The dashboard should display the number of records successfully injected during playback and the total number of records available in the selected recording.
-
-The values must update based on the active playback session.
+The Status dashboard should allow the user to safely stop an active playback. The UI must ask for confirmation before stopping because playback cannot be resumed.
 
 Acceptance Criteria:
 
-1. Records Injected
-- Display a "Records Injected" value in the Status tab.
-- The value represents the number of RawReads successfully processed/sent so far.
-- The value updates continuously while playback is running.
+1. Stop Button
+- Display a prominent "Stop" button in the Status tab while playback is active.
+- Do not add a Pause button.
 
-2. Total Records
-- Display a "Total Records" value in the Status tab.
-- The value represents the total number of RawReads in the selected .sqlite recording.
-- The total value remains consistent throughout the playback session.
+2. Confirmation
+- When Stop is clicked, display a confirmation dialog.
+- The dialog should clearly inform the user that playback cannot be resumed.
+- Playback must continue if the user cancels the confirmation.
 
-3. Playback Completion
-- When playback completes successfully, Records Injected should match Total Records.
-- The final values remain visible after playback completes.
+3. Stop Playback
+- If the user confirms, send the stop/abort request to the backend.
+- The active playback must stop data injection safely.
+- The playback state must update to aborted/stopped.
 
-4. Existing Functionality
-- Existing playback, progress tracking, timer, and Configuration/Status tab behavior must continue to work without regression.
+4. UI Reset
+- After playback is stopped, unlock the Configuration controls.
+- Allow the user to configure and start a new playback session.
+- The final stopped/aborted state should be reflected correctly in the UI.
+
+5. Existing Functionality
+- Existing playback, progress tracking, metrics, timer, and tab navigation must continue to work without regression.
