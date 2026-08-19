@@ -1,31 +1,34 @@
-[RRE][UI] Implement playback Stop/Abort control
+[RRE][UI] Implement real-time playback activity log
 
 Description:
 
-Implement the Stop/Abort control for an active Replay Engine playback session.
+Implement the playback Activity Log in the Replay Engine Status dashboard.
 
-The Status dashboard should allow the user to safely stop an active playback. The UI must ask for confirmation before stopping because playback cannot be resumed.
+The Activity Log should display important playback events in chronological order so the user can clearly understand what is happening during the active replay session.
 
 Acceptance Criteria:
 
-1. Stop Button
-- Display a prominent "Stop" button in the Status tab while playback is active.
-- Do not add a Pause button.
+1. Activity Log
+- Display an Activity Log section in the Status tab.
+- New playback events should appear in chronological order.
+- The log area should support scrolling when the number of entries increases.
 
-2. Confirmation
-- When Stop is clicked, display a confirmation dialog.
-- The dialog should clearly inform the user that playback cannot be resumed.
-- Playback must continue if the user cancels the confirmation.
+2. Log Entries
+- Each entry should include a timestamp and clear message.
+- Show important events such as:
+  - Playback started
+  - Target connection/status messages
+  - Playback warnings or failures
+  - Playback completed successfully
+  - Playback stopped/aborted by the user
 
-3. Stop Playback
-- If the user confirms, send the stop/abort request to the backend.
-- The active playback must stop data injection safely.
-- The playback state must update to aborted/stopped.
+3. Real-Time Updates
+- New activity entries should appear while playback is running.
+- The user should not need to refresh the page to see new events.
 
-4. UI Reset
-- After playback is stopped, unlock the Configuration controls.
-- Allow the user to configure and start a new playback session.
-- The final stopped/aborted state should be reflected correctly in the UI.
+4. Final State
+- The final completion, failure, or aborted message should remain visible after playback ends.
+- Existing activity entries should remain available for the completed playback session.
 
 5. Existing Functionality
-- Existing playback, progress tracking, metrics, timer, and tab navigation must continue to work without regression.
+- Existing playback, progress tracking, live metrics, timer, Stop/Abort control, and Configuration/Status tab behavior must continue to work without regression.
