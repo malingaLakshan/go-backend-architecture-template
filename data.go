@@ -1,32 +1,28 @@
-[RRE][UI] Implement real-time playback progress tracking
+[RRE][UI] Implement live playback metrics
 
 Description:
 
-Implement real-time playback progress tracking in the Replay Engine Status dashboard.
+Implement live playback metrics in the Replay Engine Status dashboard.
 
-The dashboard should show the current progress of the active playback session using a progress bar and playback timer.
+The dashboard should display the number of records successfully injected during playback and the total number of records available in the selected recording.
 
-The progress information should update continuously while records are being injected by the Replay Engine.
+The values must update based on the active playback session.
 
 Acceptance Criteria:
 
-1. Progress Bar
-- Display a visual progress bar in the Status tab.
-- The progress bar represents the current playback progress.
-- Progress updates continuously while playback is running.
-- Progress reaches 100% when playback completes successfully.
+1. Records Injected
+- Display a "Records Injected" value in the Status tab.
+- The value represents the number of RawReads successfully processed/sent so far.
+- The value updates continuously while playback is running.
 
-2. Playback Timer
-- Display playback time in HH:MM:SS / HH:MM:SS format.
-- The first value represents the current elapsed playback time.
-- The second value represents the total duration of the recording.
-- Example: 00:38:42 / 01:25:17.
-- The timer updates every second while playback is running.
+2. Total Records
+- Display a "Total Records" value in the Status tab.
+- The value represents the total number of RawReads in the selected .sqlite recording.
+- The total value remains consistent throughout the playback session.
 
-3. Playback State
-- Progress information starts updating when playback begins.
-- Progress information stops updating when playback completes or is stopped.
-- The final progress state is displayed correctly when playback completes.
+3. Playback Completion
+- When playback completes successfully, Records Injected should match Total Records.
+- The final values remain visible after playback completes.
 
 4. Existing Functionality
-- Existing playback functionality and Configuration/Status tab navigation must continue to work without regression.
+- Existing playback, progress tracking, timer, and Configuration/Status tab behavior must continue to work without regression.
