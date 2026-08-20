@@ -1,98 +1,29 @@
-Create a short Word document titled:
+[RRE][UI] Align Replay Engine UI with Command Center theming and shared UI components
 
-“JSON Event Stream Investigation – Current Status”
+Description:
 
-Use simple English and keep it to 1–2 pages. Cover only the Event stream.
+Align the Replay Engine UI with the existing Command Center design system and shared UI components.
 
-Include these sections:
+Update the Replay Engine UI styling and components to provide a consistent look and feel with the Command Center while preserving all existing Replay Engine functionality.
 
-1. Event Stream Workflow
+Acceptance Criteria:
 
-The application service writes asset updates into the MongoDB assets collection.
+1. Command Center Theming
+- Apply the existing Command Center theme, colors, typography, spacing, and visual standards to the Replay Engine UI.
+- Maintain a consistent appearance across Configuration and Status views.
 
-The datafeed-service watches those MongoDB changes and generates business events such as:
+2. Shared UI Components
+- Reuse existing Command Center/shared UI components where applicable.
+- Avoid duplicating components or styles that already exist in the shared component library.
 
-* ARRIVAL
-* POSITION_CHANGE
-* REGION_CHANGE
-* FLOOR_CHANGE
-* DEPARTURE
-* EXIT
-* GHOST
-* MISSING
+3. Replay Engine UI
+- Align buttons, inputs, dropdowns, tabs, cards, status indicators, dialogs, progress elements, and other applicable controls with the Command Center design.
+- Preserve the existing responsive and centered layout behavior.
 
-The workflow is:
+4. Existing Functionality
+- Theming/component changes must not change Replay Engine business logic or workflow behavior.
+- Existing target connection, validation, playback, status, progress, metrics, activity log, and Stop/Abort functionality must continue to work without regression.
 
-Application Service → MongoDB Assets → Datafeed Service → JSON Events → Configured Output
-
-2. Datafeed and Destination Topic
-
-There is no default MQTT topic for Events.
-
-A datafeed must be configured. The datafeed defines:
-
-* Which events should be included
-* Where the generated JSON should be sent
-* The destination MQTT broker and topic
-
-We configured this test destination topic:
-
-resonate/locate/3b96f652-8200-3920-8a2c-0486c358964e/events/json
-
-3. What We Tested
-
-The feed was created and became ACTIVE.
-
-The simulator was running and MongoDB asset data was changing.
-
-The datafeed-service generated valid JSON Event arrays containing fields such as:
-
-* id
-* type
-* productId
-* site
-* floor
-* confidence
-* region
-* timestamp
-* events
-* x, y and z
-
-However, subscribing to the configured MQTT topic returned no messages.
-
-4. What We Found
-
-The datafeed logs showed:
-
-MOCK TRANSPORT: MQTT
-
-This means the service generates the JSON Events but only prints them in the container logs. It does not actually publish them to the MQTT broker.
-
-Therefore:
-
-* Event generation is working.
-* JSON Event payload creation is working.
-* The configured feed is ACTIVE.
-* Real MQTT publishing is not working.
-* The Events can currently be viewed only through the datafeed-service logs.
-
-5. Current State
-
-The Event stream logic works inside datafeed-service, but there is currently no usable MQTT Event stream because the deployed service uses mock transport.
-
-The dashboard WebSocket and /api/assets response contain current location or asset-state data. They are not the business Event stream produced by datafeed-service.
-
-6. Information Required From the Service Team
-
-Ask the following questions:
-
-* Is mock transport intentional in this deployed version?
-* How can we enable real MQTT transport?
-* Is a configuration setting, environment variable, or different Docker image required?
-* Is there a recommended standard MQTT topic for Events?
-* If MQTT is unavailable, is another supported Event output available, such as HTTP, WebSocket or file output?
-* How should JSON Events containing multiple values in events[] be stored in the ResonateEvents table?
-
-Finish with this conclusion:
-
-“Business Event generation has been verified successfully inside datafeed-service. The remaining blocker is Event delivery because the current service uses mock MQTT transport instead of publishing the generated JSON to the configured MQTT topic.”
+5. Maintainability
+- Avoid unnecessary custom styling where an existing shared component or theme can be reused.
+- Keep the implementation consistent with existing Command Center frontend standards.
