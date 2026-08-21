@@ -1,1 +1,1 @@
-~/resonate-sim-venv/bin/python -m pip install protobuf==6.31.1
+cd /opt/zebra/alt-resonate-locate/tnv/sim && ~/resonate-sim-venv/bin/python sim-mqtt.py
