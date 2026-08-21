@@ -1,1 +1,1 @@
-cd /opt/zebra/alt-resonate-locate/tnv/sim && ~/resonate-sim-venv/bin/python sim-mqtt.py
+~/resonate-sim-venv/bin/python -m pip install paho-mqtt
