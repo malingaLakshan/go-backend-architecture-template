@@ -1,1 +1,1 @@
-sed -n '1,15p' /opt/zebra/alt-resonate-locate/tnv/sim/messages_pb2.py
+~/resonate-sim-venv/bin/python -m pip install protobuf==6.31.1
