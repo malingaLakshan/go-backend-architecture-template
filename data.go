@@ -1,1 +1,1 @@
-grep -nE '^(import|from) ' sim-mqtt.py messages_pb2.py
+sed -n '1,15p' /opt/zebra/alt-resonate-locate/tnv/sim/messages_pb2.py
