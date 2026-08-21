@@ -1,1 +1,1 @@
-Thank you, Steve and David, for the clear explanation and for setting up the new VM. We will move our Event stream testing to trirh902 and verify the real MQTT output using the provided steps. We really appreciate your support.
+curl -sS -w '\nHTTP %{http_code}\n' http://localhost:8080/sites
