@@ -14,25 +14,59 @@ LOCATION_TOPIC = f"resonate/locate/{SITE_ID}/locationUpdate"
 message_count = 0
 total_locations = 0
 
+expected_fields = {
+    "item_id", "x", "y", "z", "floor", "floor_id",
+    "region", "confidence", "state", "timestamp_ns", "reason"
+}
+
+
+def all_descriptors():
+    pending = list(
+        messages_pb2.DESCRIPTOR.message_types_by_name.values()
+    )
+
+    while pending:
+        descriptor = pending.pop(0)
+        yield descriptor
+        pending.extend(descriptor.nested_types)
+
 
 def find_location_bundle():
-    for descriptor in messages_pb2.DESCRIPTOR.message_types_by_name.values():
+    best_match = None
+
+    for descriptor in all_descriptors():
         for field in descriptor.fields:
             if (
                 field.label == field.LABEL_REPEATED
                 and field.message_type is not None
             ):
-                child_fields = {
+                child_names = {
                     child.name for child in field.message_type.fields
                 }
 
-                if {"item_id", "x", "y", "reason"}.issubset(child_fields):
-                    return (
-                        message_factory.GetMessageClass(descriptor),
-                        field.name
+                score = len(expected_fields.intersection(child_names))
+
+                if best_match is None or score > best_match[0]:
+                    best_match = (
+                        score,
+                        descriptor,
+                        field.name,
+                        child_names
                     )
 
-    raise RuntimeError("Location bundle type was not found")
+    if best_match is None or best_match[0] < 3:
+        raise RuntimeError("Location bundle type was not found")
+
+    score, descriptor, field_name, child_names = best_match
+
+    print(f"Detected bundle: {descriptor.name}")
+    print(f"Locations field: {field_name}")
+    print(f"Location fields: {sorted(child_names)}")
+
+    return (
+        message_factory.GetMessageClass(descriptor),
+        field_name
+    )
 
 
 LocationBundle, locations_field = find_location_bundle()
@@ -60,7 +94,6 @@ def print_fields(protobuf_message):
 def on_connect(client, userdata, flags, reason_code, properties):
     print(f"Connected to MQTT: {reason_code}")
     print(f"Subscribed to: {LOCATION_TOPIC}")
-    print(f"Detected Protobuf type: {LocationBundle.DESCRIPTOR.name}")
     client.subscribe(LOCATION_TOPIC)
 
 
@@ -69,7 +102,6 @@ def on_message(client, userdata, message):
 
     bundle = LocationBundle()
     bundle.ParseFromString(message.payload)
-
     locations = getattr(bundle, locations_field)
 
     message_count += 1
@@ -77,8 +109,7 @@ def on_message(client, userdata, message):
 
     print("\n" + "=" * 75)
     print(f"MQTT MESSAGE #{message_count}")
-    print(f"Topic: {message.topic}")
-    print(f"Locations in message: {len(locations)}")
+    print(f"Locations received: {len(locations)}")
 
     for index, location in enumerate(locations, start=1):
         print(f"\nLOCATION #{index}")
