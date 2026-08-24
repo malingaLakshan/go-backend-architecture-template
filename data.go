@@ -1,10 +1,9 @@
-Good morning Steve,
+Hi Steve,
 
-We confirmed that the RawRFID and SOW/location streams are working and have default MQTT topics:
+We can access the SiteGraph for one site using:
 
-* resonate/locate/<site-id>/rawrfid
-* resonate/locate/<site-id>/locationUpdate
+http://117108-trirh902.117asd.zebra.lan:3389/api/sitegraph/<site-id>
 
-We also successfully received JSON Events on the new VM. However, Events do not have a default topic—we had to create and start a datafeed with a configured destination topic.
+However, we receive a CORS error when calling this API from our application.
 
-Could you please confirm whether our Recorder and Validator should create and manage this datafeed, or whether Resonate will provide a preconfigured Event datafeed and topic?
+We also need an API to retrieve the complete site list before selecting one site. Could you please provide the correct site-list endpoint and advise how the CORS issue should be handled?
