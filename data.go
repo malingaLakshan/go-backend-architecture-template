@@ -1,1 +1,10 @@
-sudo docker compose -f /opt/zebra/alt-resonate-locate/svc/docker-compose.yml logs --tail=100 api
+for p in \
+"/trifecta/v1/sds/sites" \
+"/trifecta/v1/sds/sites/" \
+"/api/trifecta/v1/sds/sites" \
+"/v1/sds/sites" \
+"/sites"
+do
+  code=$(curl -s -o /tmp/site-response.txt -w "%{http_code}" "http://localhost:8080$p")
+  echo "$code  $p"
+done
