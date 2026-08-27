@@ -1,1 +1,1 @@
-sudo ss -lntp | grep ':443'
+Please note that 26 and 27 August are public holidays in Sri Lanka. We will review the updated requirements, perform the necessary API checks tomorrow, 28 August, and share an update once completed. Thank you for your understanding.
