@@ -1,2 +1,1 @@
-cd /opt/zebra/alt-resonate-locate/svc
-sudo docker compose logs --since 10m datafeed 2>&1 | tail -100
+Thank you, Andrew. Understood. I’ll test the Site List API over HTTPS and review the updated requirements and subtasks. We’ll also use the backend for the single-site SiteGraph request.
