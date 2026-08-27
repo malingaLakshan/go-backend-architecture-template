@@ -1,1 +1,1 @@
-Thank you, Andrew. Understood. I’ll test the Site List API over HTTPS and review the updated requirements and subtasks. We’ll also use the backend for the single-site SiteGraph request.
+https://117108-trirh902.117asd.zebra.lan/trifecta/v1/sds/sites
