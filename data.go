@@ -1,1 +1,1 @@
-https://117108-trirh902.117asd.zebra.lan/trifecta/v1/sds/sites
+sudo ss -lntp | grep ':443'
