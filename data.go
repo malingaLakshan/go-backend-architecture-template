@@ -1,13 +1,18 @@
 Hi Andrew,
 
-Thank you. I tested the Site List endpoint using the new VM hostname:
+To explain our current finding clearly, the Resonate environment provides two default MQTT topics:
 
-https://117108-trirh902.117asd.zebra.lan/trifecta/v1/sds/sites
+* RawRFID: resonate/locate/<site-id>/rawrfid
+* Location: resonate/locate/<site-id>/locationUpdate
 
-The browser returned ERR_CONNECTION_CLOSED. I also checked the VM and confirmed that no service is currently listening on host port 443.
+There is no default MQTT topic for Events.
 
-Could you please confirm whether port 443 should be exposed on this lab VM or whether hostname.zebra.lan refers to a different host? If it is a different service, could you please provide the correct hostname and authentication method?
+For our investigation, we manually created and started a datafeed and configured our own destination topic:
 
-Regarding the single-site SiteGraph endpoint, our application is already calling it through our backend. The endpoint works when opened directly in the browser. However, when the request is made through our application’s backend flow, the browser reports a CORS error and the request fails.
+resonate/locate/<site-id>/events/json
 
-Could you please confirm the expected CORS or proxy configuration for this flow and whether any specific authentication, headers or certificates are required?
+We then subscribed to this topic and successfully received JSON Events. This was only a manual test setup; the Event topic was not provided by Resonate.
+
+We understand that the updated Recorder and Validator requirements allow the broker URL and Event topic to be provided through configuration. For this integration, we need Resonate to provide and manage a running datafeed with a configured Event topic, so the Recorder and Validator can subscribe to it.
+
+Could you please confirm this setup and provide the Event topic that should be used?
