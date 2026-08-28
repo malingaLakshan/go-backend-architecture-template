@@ -1,1 +1,1 @@
-Worked on the Replay Engine UI, completed one tab, and brought the second tab to approximately 90% completion. Also investigated the real Resonate instance, including its MQTT streams, Event datafeed, destination topic, and SiteGraph APIs.
+nano ~/event_stream_subscriber.py
