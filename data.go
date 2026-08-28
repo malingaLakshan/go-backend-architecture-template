@@ -1,13 +1,9 @@
 Hi Andrew,
 
-Thank you. I tested the Site List endpoint using the new VM hostname:
+Thank you for updating the requirements. We understand that the Recorder and Validator will read the transport, brokerUrl, and topic from the resonateEventStream configuration and subscribe to the configured MQTT topic.
 
-https://117108-trirh902.117asd.zebra.lan/trifecta/v1/sds/sites
+One integration responsibility still needs clarification. During our testing, Events were published only after we manually created and started a datafeed with a configured MQTT destination topic. The topic we used was configured by us for that datafeed; it is not a default Resonate Event topic.
 
-The browser returned ERR_CONNECTION_CLOSED. I also checked the VM, and no service is currently listening on host port 443.
+Could you please confirm whether creating, configuring, starting, and managing the datafeed should be treated as an external prerequisite managed by the Resonate deployment/operator, or whether any of this responsibility belongs to the Recorder or Validator?
 
-Could you please confirm whether port 443 should be exposed on this lab VM, or whether hostname.zebra.lan refers to a different host? If it refers to another service, could you please provide the intended hostname and the required authentication method?
-
-Regarding the single-site SiteGraph endpoint, our application is already calling it through our backend. The endpoint works when opened directly in the browser, but the request made through our backend fails.
-
-Could you please confirm whether the backend request requires any authentication, specific headers, certificates, or additional service configuration?
+If it is an external prerequisite, should this also be stated in the acceptance criteria or integration documentation?
