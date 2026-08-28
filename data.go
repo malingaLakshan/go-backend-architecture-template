@@ -1,1 +1,13 @@
-~/resonate-sim-venv/bin/python -c 'import json; import paho.mqtt.client as mqtt; topic="resonate/locate/3b96f652-8200-3920-8a2c-0486c358964e/events/json"; client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2); client.on_connect=lambda c,u,f,r,p: (print("Connected and subscribed to: "+topic,flush=True),c.subscribe(topic)); client.on_message=lambda c,u,m: print(json.dumps(json.loads(m.payload.decode()),indent=2),flush=True); client.connect("127.0.0.1",1883,60); client.loop_forever()'
+Hi Andrew,
+
+Thank you. I tested the Site List endpoint using the new VM hostname:
+
+https://117108-trirh902.117asd.zebra.lan/trifecta/v1/sds/sites
+
+The browser returned ERR_CONNECTION_CLOSED. I also checked the VM, and no service is currently listening on host port 443.
+
+Could you please confirm whether port 443 should be exposed on this lab VM, or whether hostname.zebra.lan refers to a different host? If it refers to another service, could you please provide the intended hostname and the required authentication method?
+
+Regarding the single-site SiteGraph endpoint, our application is already calling it through our backend. The endpoint works when opened directly in the browser, but the request made through our backend fails.
+
+Could you please confirm whether the backend request requires any authentication, specific headers, certificates, or additional service configuration?
