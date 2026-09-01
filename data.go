@@ -1,5 +1,4 @@
-Thank you, Andrew. Understood—the test tools will only subscribe to the Event topic.
+Thank you, Ramesh. Please let me know a convenient time today, and we can sync to configure the datafeed and Event stream.Thank you, Steve. Yes, please proceed with updating the first VM with the latest images tomorrow morning and let us know once it is complete.
 
-Could someone from the Resonate team please configure and start the datafeed on our test VM and share the broker URL and Event topic? Our integration testing is currently blocked because we do not yet have a reliable real Event stream.
 
-Please let us know when this can be available.
+
