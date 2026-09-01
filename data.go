@@ -1,7 +1,7 @@
 Hi Astha,
 
-Yes, we need help with the Resonate Event stream. RawRFID and Location already have default MQTT topics, but Events do not have a default topic.
+Thank you for the detailed explanation. The lab-json-events feed and the events/json destination topic shown here were created during our investigation.
 
-We need the Resonate team to configure and start the required datafeed and provide us with the MQTT broker, port, and Event topic details. Our Recorder and Validator will only subscribe to that Event topic for testing.
+Our remaining requirement is to have the correct Resonate-supported datafeed configured for this test environment, with the appropriate Event filters and destination settings. We also need to verify that it provides a reliable Event stream, because the current setup produces delayed batches and some messages fail with OutgoingPacketTooLarge.
 
-Could you please help us set this up on the test VM?
+Could we review and configure the correct datafeed together during the meeting?
